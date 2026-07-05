@@ -1,6 +1,9 @@
-// ── shared UI: context, markdown, small components ──────────────
-const LakeCtx = React.createContext(null);
-function useLake() { return React.useContext(LakeCtx); }
+// frontend/components/ui.jsx
+// 共用 UI 元件：迷你 Markdown 渲染器、圖片佔位、封面 Gallery、區塊標題與分類 Chip
+
+"use client";
+
+import React from "react";
 
 // tiny markdown renderer (headings/bold/italic/code/list/quote/link/hr)
 function mdInline(s) {
@@ -19,7 +22,8 @@ function mdInline(s) {
   }
   return out;
 }
-function Markdown({ text, size }) {
+
+export function Markdown({ text, size }) {
   const blocks = [];
   const lines = (text || "").split("\n");
   let i = 0, k = 0;
@@ -55,7 +59,7 @@ function Markdown({ text, size }) {
 }
 
 // markdown image (placeholder fallback when src missing/broken)
-function MdImage({ alt, src }) {
+export function MdImage({ alt, src }) {
   const [err, setErr] = React.useState(false);
   if (!src || err) return <div className="ph h-40 my-4">{alt || "image"}</div>;
   return (
@@ -67,12 +71,12 @@ function MdImage({ alt, src }) {
 }
 
 // thumbnail placeholder
-function Thumb({ label, className }) {
+export function Thumb({ label, className }) {
   return <div className={"ph " + (className || "")}>{label}</div>;
 }
 
 // cover gallery — 左右切換的展示封面（最多 10 張）
-function Gallery({ images, label, className }) {
+export function Gallery({ images, label, className }) {
   const imgs = (images || []).slice(0, 10);
   const [i, setI] = React.useState(0);
   const [err, setErr] = React.useState({});
@@ -109,7 +113,7 @@ function Gallery({ images, label, className }) {
 }
 
 // front section header — heavy rule in day, thin in night
-function SecHead({ num, zh, en, sub }) {
+export function SecHead({ num, zh, en, sub }) {
   return (
     <div className="mb-5 theme-fade">
       <div className="flex items-baseline justify-between border-t rule-heavy pt-3">
@@ -124,7 +128,7 @@ function SecHead({ num, zh, en, sub }) {
 }
 
 // category chip
-function Chip({ children, active, onClick }) {
+export function Chip({ children, active, onClick }) {
   return (
     <button onClick={onClick}
       className={"mono text-[11px] px-2.5 py-1 border rad cursor-pointer tap " + (active ? "v-acc-bg border-transparent" : "v-line v-dim hover:opacity-75")}>
@@ -132,13 +136,3 @@ function Chip({ children, active, onClick }) {
     </button>
   );
 }
-
-// route helpers — hash router
-function parseHash() {
-  const h = (location.hash || "#/home").replace(/^#\/?/, "");
-  const parts = h.split("/").filter(Boolean);
-  return { page: parts[0] || "home", param: parts[1] || null };
-}
-function go(path) { location.hash = "#/" + path; }
-
-Object.assign(window, { LakeCtx, useLake, Markdown, MdImage, Thumb, Gallery, SecHead, Chip, parseHash, go });

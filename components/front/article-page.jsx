@@ -1,43 +1,23 @@
-// ── front: blog list / article page / works showcase ────────────
-function BlogPage() {
-  const { db, theme } = useLake();
-  const [cat, setCat] = React.useState("全部");
-  const pub = db.articles.filter(a => a.status === "published");
-  const cats = ["全部", ...Array.from(new Set([...(db.settings.catsBlog || []), ...pub.map(a => a.cat)]))];
-  const list = (cat === "全部" ? pub : pub.filter(a => a.cat === cat))
-    .slice().sort((a, b) => b.date < a.date ? -1 : 1);
+// frontend/components/front/article-page.jsx
+// 文章閱讀頁：橫幅、字級調整、Markdown 內文、閱讀數統計與文章留言區
 
-  return (
-    <div>
-      <SecHead num="03" zh="部落格" en="BLOG"
-        sub={theme === "night" ? "$ ls blog/ --sort=date | grep " + (cat === "全部" ? "'*'" : "'" + cat + "'") : "小說、隨筆與技術筆記。"} />
-      <div className="flex flex-wrap gap-2 mb-6">
-        {cats.map(c => <Chip key={c} active={cat === c} onClick={() => setCat(c)}>{c}</Chip>)}
-      </div>
-      <div className="space-y-0">
-        {list.map(a => (
-          <button key={a.id} onClick={() => go("article/" + a.id)}
-            className="w-full text-left py-4 border-b v-soft cursor-pointer group block">
-            <div className="flex items-baseline gap-3 mb-1">
-              <span className="mono text-[10px] v-dim shrink-0 w-24">{a.date}</span>
-              <span className="mono text-[9.5px] v-acc shrink-0 border v-line rad px-1.5 py-0.5">{a.cat}</span>
-              <span className="ntc text-[16px] sm:text-[17px] font-black group-hover:underline">{a.title}</span>
-            </div>
-            <div className="ntc text-[12.5px] v-dim leading-relaxed sm:pl-[108px] max-w-2xl">{a.blurb}</div>
-            {a.award && <div className="mono text-[10px] v-acc2 mt-1 sm:pl-[108px]">★ {a.award}</div>}
-          </button>
-        ))}
-      </div>
-      {list.length === 0 && <div className="mono text-[12px] v-dim py-10 text-center">此分類尚無文章。</div>}
-    </div>
-  );
-}
+"use client";
 
-function ArticlePage({ id }) {
+import React from "react";
+import { useRouter } from "next/navigation";
+import { useLake } from "@/store/lake-context";
+import { Lake } from "@/store/lake";
+import { SecHead, Markdown } from "@/components/ui";
+
+export default function ArticlePage({ id }) {
   const { db, update, theme } = useLake();
+  const router = useRouter();
   const a = db.articles.find(x => x.id === id);
   const night = theme === "night";
-  const [fs, setFs] = React.useState(() => Number(localStorage.getItem("lake_read_fs")) || 14.5);
+  const [fs, setFs] = React.useState(14.5);
+  React.useEffect(() => {
+    setFs(Number(localStorage.getItem("lake_read_fs")) || 14.5);
+  }, []);
   const setFsP = v => { setFs(v); localStorage.setItem("lake_read_fs", v); };
   // count a view once per session
   React.useEffect(() => {
@@ -51,19 +31,20 @@ function ArticlePage({ id }) {
         return d;
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
   if (!a || a.status !== "published") {
     return (
       <div className="py-16 text-center">
         <div className="mono text-[13px] v-dim mb-4">404 — 找不到這篇文章（可能已下架）。</div>
-        <button className="btn ntc" onClick={() => go("blog")}>← 回部落格</button>
+        <button className="btn ntc" onClick={() => router.push("/blog")}>← 回部落格</button>
       </div>
     );
   }
   return (
     <div className="max-w-[720px] mx-auto">
       <div className="flex items-center justify-between mb-6">
-        <button onClick={() => go("blog")} className="mono text-[11px] v-dim hover-rule cursor-pointer tap">
+        <button onClick={() => router.push("/blog")} className="mono text-[11px] v-dim hover-rule cursor-pointer tap">
           {night ? "$ cd ../blog" : "← 回部落格目錄"}
         </button>
         <label className="flex items-center gap-1.5 mono text-[10px] v-dim">
@@ -189,84 +170,3 @@ function ArticleComments({ article }) {
     </div>
   );
 }
-
-// ── works：與部落格連動 — 展示的是標記 showcase 的文章，點開直接閱讀全文 ──
-function WorkGridCard({ a, idx }) {
-  return (
-    <div className="v-card overflow-hidden flex flex-col theme-fade cursor-pointer group" onClick={() => go("article/" + a.id)}>
-      <Gallery images={a.gallery} label={"cover · " + a.title} className="h-40" />
-      <div className="p-4 flex-1 flex flex-col">
-        <div className="flex items-baseline justify-between gap-2 mb-1">
-          <div className="ntc font-black text-[15px] leading-snug group-hover:underline">{a.title}</div>
-          <div className="mono text-[10px] v-dim shrink-0">{a.y || ""}</div>
-        </div>
-        {a.award && <div className="mono text-[9.5px] v-acc mb-2">{a.award}</div>}
-        <div className="ntc text-[12px] v-dim leading-relaxed flex-1 line-clamp-3">{a.blurb}</div>
-        <div className="mono text-[9.5px] v-dim mt-3 pt-2 border-t v-soft flex justify-between">
-          <span>NO. {String(idx + 1).padStart(2, "0")}</span>
-          <span className="v-acc">閱讀全文 →</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-function WorkListRow({ a }) {
-  return (
-    <div className="v-card p-3 flex gap-3 items-stretch theme-fade cursor-pointer group" onClick={() => go("article/" + a.id)}>
-      <Gallery images={a.gallery} label="cover" className="w-24 sm:w-32 shrink-0 self-stretch min-h-[72px]" />
-      <div className="flex-1 min-w-0 py-0.5">
-        <div className="flex items-baseline gap-2 flex-wrap">
-          <span className="mono text-[10px] v-dim">{a.y}</span>
-          <span className="ntc font-bold text-[14px] group-hover:underline">{a.title}</span>
-          <span className="mono text-[9.5px] v-acc">{a.award}</span>
-        </div>
-        <div className="ntc text-[12px] v-dim leading-relaxed mt-1 line-clamp-2">{a.blurb}</div>
-        <div className="mono text-[9.5px] v-acc mt-1.5">閱讀全文 →</div>
-      </div>
-    </div>
-  );
-}
-
-function WorksPage() {
-  const { db, theme } = useLake();
-  const wCats = db.settings.catsWorks || [];
-  const [tab, setTab] = React.useState("全部");
-  const all = db.articles.filter(a => a.showcase && a.status === "published");
-  const grid = theme !== "night"; // MAG=grid, TERM=list
-  const showCats = tab === "全部" ? wCats : [tab];
-
-  return (
-    <div>
-      <SecHead num="02" zh="作品展示" en="WORKS"
-        sub={grid ? "編輯台上的陳列架 — 點開任一作品即可閱讀全文。" : "$ ls works/ --link=blog — 點開作品即閱讀全文。"} />
-      <div className="flex flex-wrap gap-2 mb-7">
-        <Chip active={tab === "全部"} onClick={() => setTab("全部")}>全部</Chip>
-        {wCats.map(c => <Chip key={c} active={tab === c} onClick={() => setTab(c)}>{c}</Chip>)}
-      </div>
-
-      {showCats.map(c => {
-        const list = all.filter(a => a.workCat === c);
-        if (list.length === 0) return null;
-        return (
-          <section key={c} className="mb-10">
-            <div className="mono text-[10.5px] v-dim uppercase tracking-[.2em] mb-3 border-b v-soft pb-1.5">
-              {grid ? "— " + c + " —" : "## " + c + "/"} <span className="v-acc">{list.length}</span>
-            </div>
-            {grid ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {list.map((a, i) => <WorkGridCard key={a.id} a={a} idx={i} />)}
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {list.map(a => <WorkListRow key={a.id} a={a} />)}
-              </div>
-            )}
-          </section>
-        );
-      })}
-      {all.length === 0 && <div className="mono text-[12px] v-dim py-10 text-center">尚無展示中的作品 — 到後台將文章加入作品展示。</div>}
-    </div>
-  );
-}
-
-Object.assign(window, { BlogPage, ArticlePage, ArticleComments, WorksPage });

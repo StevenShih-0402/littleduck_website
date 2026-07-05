@@ -1,5 +1,7 @@
-// Content extracted from the old Google Sites export.
-window.SITE = {
+// frontend/data/site.js
+// 站台種子內容：自舊 Google Sites 匯出整理的個人資料、時間軸、文學與程式作品
+
+export const SITE = {
   brand: "小鴨ㄉ創作湖畔",
   brandEn: "Little Duck's Creative Lakeside",
   owner: "Steven SHIH",
