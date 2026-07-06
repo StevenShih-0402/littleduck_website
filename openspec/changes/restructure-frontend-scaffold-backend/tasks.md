@@ -35,7 +35,7 @@
 
 ## 5. Docker 與收尾
 
-- [ ] 5.1 撰寫 multi-stage Dockerfile 與 docker-compose.yml（api + postgres:16 + volume），驗證 `docker compose up` 後 `/health` 與 `/swagger` 可用
+- [x] 5.1 撰寫 multi-stage Dockerfile 與 docker-compose.yml（api + postgres:16 + volume），驗證 `docker compose up` 後 `/health` 與 `/swagger` 可用
 - [x] 5.2 執行 `go test ./...` 全綠；backend repo initial commit
 - [x] 5.3 backend `README.md`：架構說明、環境變數表、啟動方式、swag 產生流程
 - [x] 5.4 根目錄 `git init`、`.gitignore`（排除 `frontend/`、`backend/`、`go1.26.0.linux-amd64.tar.gz`）、根 `README.md`（三 repo 關係與專案總覽）、initial commit
