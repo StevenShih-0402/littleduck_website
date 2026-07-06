@@ -1,0 +1,20 @@
+# backend/.gitignore
+# Go 專案忽略清單
+
+# binaries
+/bin/
+/server
+
+# env files（秘密值不進版控）
+.env
+.env.*
+!.env.example
+
+# test & coverage
+*.out
+*.test
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
