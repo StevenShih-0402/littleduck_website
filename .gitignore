@@ -1,0 +1,11 @@
+# .gitignore
+# 根 repo 忽略清單：frontend 與 backend 為獨立 git repo，根只追蹤外層檔案
+
+/frontend/
+/backend/
+/go1.26.0.linux-amd64.tar.gz
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
