@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "linear": {
+      "type": "http",
+      "url": "https://mcp.linear.app/mcp"
+    },
+    "hackmd": {
+      "type": "http",
+      "url": "https://mcp.hackmd.io/"
+    },
+    "docker": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["mcp-server-docker"]
+    }
+  }
+}
