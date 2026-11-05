@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "design:check": "node scripts/design-sync.mjs check",
+    "design:update": "node scripts/design-sync.mjs update",
+    "test:design": "node --test scripts/design-sync.test.mjs"
   },
   "dependencies": {
     "next": "14.2.35",
