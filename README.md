@@ -7,15 +7,13 @@
 
 ## Repo 結構
 
-本專案由 **三個獨立 git repo** 組成，根 repo 以 `.gitignore` 排除兩個子資料夾，只追蹤外層檔案（規格文件、專案說明）：
+本專案以單一 git repo 管理：
 
-| Repo | 路徑 | 內容 |
-|---|---|---|
-| 根 repo | `./` | `openspec/` 規格與變更文件、`CLAUDE.md`、本 README |
-| frontend | `./frontend/` | Next.js（App Router）+ React 18 + Tailwind CSS 前端 |
-| backend | `./backend/` | Go（Gin + GORM）RESTful API + PostgreSQL + Docker |
-
-三個 repo 各自獨立提交版本，彼此的 commit 不互相關聯（非 git submodule）。
+| 路徑 | 內容 |
+|---|---|
+| `./` | `openspec/` 規格與變更文件、`CLAUDE.md`、本 README |
+| `./frontend/` | Next.js（App Router）+ React 18 + Tailwind CSS 前端 |
+| `./backend/` | Go（Gin + GORM）RESTful API + PostgreSQL + Docker |
 
 ## 快速開始
 
