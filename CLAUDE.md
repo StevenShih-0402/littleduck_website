@@ -29,6 +29,13 @@
 | osamu | integrator：檢查、歸檔、回寫 Linear、PR | `.claude/agents/osamu.md` |
 | `/ship-issue <id>` | 串起四個 Agent 的總指揮 | `.claude/commands/ship-issue.md` |
 
+## 設計同步
+
+網站設計放在 claude.ai，改完設計後用 `/design-pull` 同步到 `frontend/`。同步是單向、手動觸發的，定義檔在 `.claude/skills/design-pull/SKILL.md`。
+
+- 同步基準：`frontend/design-sync/manifest.json`，記錄設計來源、各設計檔雜湊與對應的前端檔案
+- 差異工具：在 `frontend/` 執行 `npm run design:check -- <拉取目錄>`，測試用 `npm run test:design`
+
 ## 交接規則
 
 - 所有交接都落在 `openspec/changes/<change-id>/`，Agent 之間不共享對話
