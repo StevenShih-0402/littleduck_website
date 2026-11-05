@@ -1,0 +1,17 @@
+# frontend/.gitignore
+# Next.js 專案忽略清單
+
+# dependencies
+/node_modules
+
+# next.js build output
+/.next/
+/out/
+
+# misc
+*.log
+.DS_Store
+
+# env files
+.env*
+!.env.example
