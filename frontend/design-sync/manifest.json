@@ -1,0 +1,102 @@
+{
+  "source": {
+    "artifactUrl": "https://claude.ai/artifact/HycuwGKPu29sQriZLbnPtU",
+    "include": [
+      "project/v2/",
+      "project/assets/",
+      "project/data.js",
+      "project/Personal Site v2.html"
+    ]
+  },
+  "syncedVersion": "1793889427-d763",
+  "syncedAt": "2026-11-05",
+  "files": {
+    "project/Personal Site v2.html": {
+      "sha256": "01bcb5b7dd0137786d6c18987ac72298cc029d9a9e59879f44ee7e7dbe39ea09",
+      "targets": [
+        "app/globals.css",
+        "app/layout.jsx"
+      ]
+    },
+    "project/assets/duck-logo.jpg": {
+      "sha256": "2711c31f2b14b93fb7c195fcc588ed77d441fcf5d3514ae3b4df19316810f22f",
+      "targets": [
+        "public/assets/duck-logo.jpg"
+      ]
+    },
+    "project/assets/duck-mini.jpg": {
+      "sha256": "a70bce21a3dfad629ebf213a008e742d946fa009b117964046421e4d3ca899f4",
+      "targets": [
+        "public/assets/duck-mini.jpg"
+      ]
+    },
+    "project/data.js": {
+      "sha256": "2256c60aa9512e20cfc576f712acaeb47d44e035f620aa69820a35cabcff0909",
+      "targets": [
+        "data/site.js"
+      ]
+    },
+    "project/v2/admin-manage.jsx": {
+      "sha256": "51434e62edd6abb113584cddb1d43b43a99d393607a65b2ef3fc5024a6c67baf",
+      "targets": [
+        "components/admin/admin-posts.jsx",
+        "components/admin/admin-editor.jsx",
+        "components/admin/admin-works.jsx",
+        "components/admin/admin-comments.jsx",
+        "components/admin/status-pill.jsx"
+      ]
+    },
+    "project/v2/admin-shell.jsx": {
+      "sha256": "2e9ee1f0d9f74ae02467751f5ad930cea96165c0d4ce03eb772a347a3beef083",
+      "targets": [
+        "components/admin/admin-shell.jsx",
+        "components/admin/admin-overview.jsx",
+        "components/admin/admin-sponsor.jsx",
+        "components/admin/admin-settings.jsx"
+      ]
+    },
+    "project/v2/app.jsx": {
+      "sha256": "d3cc1601b45ed1cd7dd22ad99122e86c6f691eb02fc3cfb3f75dc19d9956341d",
+      "targets": [
+        "store/lake-context.jsx",
+        "app/layout.jsx",
+        "app/(front)/layout.jsx",
+        "app/(front)/page.jsx",
+        "app/(front)/blog/page.jsx",
+        "app/(front)/blog/[id]/page.jsx",
+        "app/(front)/works/page.jsx",
+        "app/(front)/guest/page.jsx",
+        "app/admin/page.jsx"
+      ]
+    },
+    "project/v2/front-content.jsx": {
+      "sha256": "1bc9d15b23939f9ced9ef6a52073e708e6bad97ab0b3842e219d32cdc7625116",
+      "targets": [
+        "components/front/blog-page.jsx",
+        "components/front/article-page.jsx",
+        "components/front/works-page.jsx"
+      ]
+    },
+    "project/v2/front-home.jsx": {
+      "sha256": "c1cf40ee5bf16808808ab2f6d8961b28b1dd7c6f99ab4cde1fd7be5bb8de0b5c",
+      "targets": [
+        "components/front/front-shell.jsx",
+        "components/front/home-page.jsx",
+        "components/front/guest-page.jsx",
+        "components/front/sponsor-fab.jsx"
+      ]
+    },
+    "project/v2/store.js": {
+      "sha256": "71b069086e063aaa72f39f6d644fbfefc3db83ae29e273e64fd2f8c3bfa763fd",
+      "targets": [
+        "store/lake.js"
+      ]
+    },
+    "project/v2/ui.jsx": {
+      "sha256": "63a67ce5b84933843344f08d4ed99c5f3a1a848dcb3a20241d9ffe05f414f950",
+      "targets": [
+        "components/ui.jsx"
+      ]
+    }
+  }
+}
