@@ -1,0 +1,9 @@
+# backend/.dockerignore
+# 排除不需進入 build context 的檔案
+
+.git
+.env
+.env.*
+bin/
+*.out
+*.test
