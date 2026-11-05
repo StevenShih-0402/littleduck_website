@@ -1,7 +1,7 @@
 # backend-api-docs Specification
 
 ## Purpose
-swaggo 自動產生並提供 Swagger UI 文件
+由 swaggo 從程式碼註解自動產生 API 文件，並透過 Swagger UI 提供瀏覽與呼叫，讓 API 使用方能查閱與測試後端提供的端點。
 
 ## Requirements
 

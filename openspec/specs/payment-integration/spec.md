@@ -1,7 +1,7 @@
 # payment-integration Specification
 
 ## Purpose
-綠界科技金流模組骨架（設定、介面、callback 端點預留）
+提供綠界科技金流模組的骨架，包含設定、介面與 callback 端點預留，讓後續 change 能在此基礎上完成正式的金流串接流程。
 
 ## Requirements
 

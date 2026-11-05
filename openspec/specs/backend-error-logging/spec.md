@@ -1,7 +1,7 @@
 # backend-error-logging Specification
 
 ## Purpose
-統一錯誤處理（panic recovery、AppError → HTTP 回應）與結構化日誌紀錄
+統一後端的錯誤處理（panic recovery、AppError 轉換為 HTTP 回應）與結構化日誌紀錄，讓錯誤回應格式一致，並留下可追查的請求與應用日誌。
 
 ## Requirements
 
