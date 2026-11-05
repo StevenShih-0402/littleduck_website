@@ -1,0 +1,110 @@
+basePath: /
+definitions:
+  controller.healthStatus:
+    properties:
+      database:
+        type: string
+      status:
+        type: string
+    type: object
+  model.Article:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      tag:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  response.Envelope:
+    properties:
+      code:
+        type: string
+      data: {}
+      message:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: LittleDuck 個人網站後端 RESTful API
+  title: LittleDuck API
+  version: 0.1.0
+paths:
+  /api/v1/articles:
+    get:
+      description: 取得全部文章（依建立時間新到舊）
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.Article'
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Envelope'
+      summary: 文章列表
+      tags:
+      - articles
+  /api/v1/payments:
+    post:
+      consumes:
+      - application/json
+      description: 建立綠界付款交易；骨架階段回傳 501
+      produces:
+      - application/json
+      responses:
+        "501":
+          description: Not Implemented
+          schema:
+            $ref: '#/definitions/response.Envelope'
+      summary: 建立付款（未實作）
+      tags:
+      - payments
+  /api/v1/payments/ecpay/callback:
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      description: 接收綠界付款結果通知；骨架階段回傳 501
+      produces:
+      - application/json
+      responses:
+        "501":
+          description: Not Implemented
+          schema:
+            $ref: '#/definitions/response.Envelope'
+      summary: 綠界付款 callback（未實作）
+      tags:
+      - payments
+  /health:
+    get:
+      description: 回報服務與資料庫連線狀態；資料庫異常時回傳 503
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.healthStatus'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/controller.healthStatus'
+      summary: 健康檢查
+      tags:
+      - health
+swagger: "2.0"

@@ -1,0 +1,42 @@
+# backend/docker-compose.yml
+# 本機開發環境：api + PostgreSQL 16，資料以 named volume 持久化
+
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      GIN_MODE: release
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: littleduck
+      DB_PASSWORD: littleduck
+      DB_NAME: littleduck
+      DB_SSLMODE: disable
+      LOG_LEVEL: info
+      ECPAY_MERCHANT_ID: ""
+      ECPAY_HASH_KEY: ""
+      ECPAY_HASH_IV: ""
+      ECPAY_ENV: stage
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: littleduck
+      POSTGRES_PASSWORD: littleduck
+      POSTGRES_DB: littleduck
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U littleduck -d littleduck"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
