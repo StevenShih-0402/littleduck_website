@@ -1,0 +1,394 @@
+# .drone.yml
+# littleduck_website 的 Drone 流水線：CI（ci-*）與 CD（cd-*）分成不同 pipeline，階段與門檻見 docs/cicd.md
+
+# 觸發規則一覽：
+#   ci-backend／ci-frontend           PR 開啟或更新（目標 main）、推送到 main
+#   cd-backend-staging／cd-frontend-preview   推送到 main，且同一次建置的對應 CI 通過
+#   cd-backend-production／cd-frontend-production   在 Drone 對已通過的建置 promote 到 production
+#
+# 本 repo 在 Drone 必須設為 Trusted（步驟掛載主機 docker.sock 與快取目錄），並開啟 ignore forks。
+# 部署用 secret 一律不勾「Allow Pull Requests」，PR 建置拿不到。secret 清單見 docs/cicd.md。
+# YAML 內的 shell 變數一律寫成 $$VAR，避免被 Drone 的變數替換吃掉。
+
+---
+kind: pipeline
+type: docker
+name: ci-backend
+
+trigger:
+  branch:
+    - main
+  event:
+    - pull_request
+    - push
+
+services:
+  - name: postgres
+    image: postgres:16
+    environment:
+      POSTGRES_USER: littleduck
+      POSTGRES_PASSWORD: littleduck
+      POSTGRES_DB: littleduck
+
+steps:
+  - name: gofmt
+    image: golang:1.26-alpine
+    commands:
+      - cd backend
+      - unformatted=$$(gofmt -l .)
+      - if [ -n "$$unformatted" ]; then echo "以下檔案未經 gofmt 格式化："; echo "$$unformatted"; exit 1; fi
+
+  - name: go-vet
+    image: golang:1.26-alpine
+    volumes:
+      - name: gomod
+        path: /go/pkg/mod
+    commands:
+      - cd backend
+      - go vet ./...
+
+  - name: wait-postgres
+    image: postgres:16
+    commands:
+      - for i in $$(seq 1 30); do pg_isready -h postgres -U littleduck && exit 0; sleep 1; done; echo "PostgreSQL 30 秒內未就緒"; exit 1
+
+  - name: go-test
+    image: golang:1.26-alpine
+    environment:
+      CGO_ENABLED: "0"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: littleduck
+      DB_PASSWORD: littleduck
+      DB_NAME: littleduck
+      DB_SSLMODE: disable
+    volumes:
+      - name: gomod
+        path: /go/pkg/mod
+    commands:
+      - cd backend
+      - go test ./...
+
+  - name: gosec
+    image: securego/gosec:2.21.4
+    volumes:
+      - name: gomod
+        path: /go/pkg/mod
+    commands:
+      - cd backend
+      - gosec -quiet -exclude-generated ./...
+
+  - name: docker-build
+    image: docker:27.5.1-cli
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    commands:
+      - docker build -t littleduck-api:ci-${DRONE_BUILD_NUMBER} backend
+
+  - name: trivy
+    image: aquasec/trivy:0.58.1
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+      - name: trivy-cache
+        path: /root/.cache
+    commands:
+      - trivy image --quiet --severity CRITICAL,HIGH --exit-code 1 --ignorefile backend/.trivyignore littleduck-api:ci-${DRONE_BUILD_NUMBER}
+
+  - name: cleanup
+    image: docker:27.5.1-cli
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    commands:
+      - docker image rm -f littleduck-api:ci-${DRONE_BUILD_NUMBER} || true
+    when:
+      status:
+        - success
+        - failure
+
+volumes:
+  - name: gomod
+    temp: {}
+  - name: dockersock
+    host:
+      path: /var/run/docker.sock
+  - name: trivy-cache
+    host:
+      path: /var/cache/drone-trivy
+
+---
+kind: pipeline
+type: docker
+name: ci-frontend
+
+trigger:
+  branch:
+    - main
+  event:
+    - pull_request
+    - push
+
+steps:
+  - name: install
+    image: node:20-alpine
+    commands:
+      - cd frontend
+      - npm ci
+
+  - name: test-design
+    image: node:20-alpine
+    commands:
+      - cd frontend
+      - npm run test:design
+
+  - name: build
+    image: node:20-alpine
+    environment:
+      NEXT_TELEMETRY_DISABLED: "1"
+    commands:
+      - cd frontend
+      - npm run build
+
+  - name: audit
+    image: node:20-alpine
+    commands:
+      - cd frontend
+      - npm audit --audit-level=high
+
+---
+kind: pipeline
+type: docker
+name: cd-backend-staging
+
+trigger:
+  branch:
+    - main
+  event:
+    - push
+
+depends_on:
+  - ci-backend
+
+steps:
+  - name: build
+    image: docker:27.5.1-cli
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    commands:
+      - sh deploy/ci/image-ref.sh > .image-ref
+      - ref=$$(cat .image-ref); repo=$${ref%:*}; version=$$(sh deploy/ci/backend-version.sh)
+      - docker build -t "$$ref" -t "$$repo:$$version" -t "$$repo:latest" backend
+      - echo "映像：$$ref"
+
+  - name: trivy
+    image: aquasec/trivy:0.58.1
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+      - name: trivy-cache
+        path: /root/.cache
+    commands:
+      - trivy image --quiet --severity CRITICAL,HIGH --exit-code 1 --ignorefile backend/.trivyignore "$$(cat .image-ref)"
+
+  - name: push-ghcr
+    image: docker:27.5.1-cli
+    environment:
+      GHCR_USERNAME:
+        from_secret: ghcr_username
+      GHCR_TOKEN:
+        from_secret: ghcr_token
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    commands:
+      - ref=$$(cat .image-ref); repo=$${ref%:*}; version=$$(sh deploy/ci/backend-version.sh)
+      - echo "$$GHCR_TOKEN" | docker login ghcr.io -u "$$GHCR_USERNAME" --password-stdin
+      - if docker push "$$ref" && docker push "$$repo:$$version" && docker push "$$repo:latest"; then rc=0; else rc=1; fi; docker logout ghcr.io; exit $$rc
+
+  - name: bundle
+    image: alpine:3.21
+    environment:
+      API_STAGING_HOST:
+        from_secret: api_staging_host
+    commands:
+      - apk add -q gettext
+      - sh deploy/ci/backend-bundle.sh staging
+
+  - name: upload
+    image: appleboy/drone-scp:1.6.14
+    settings:
+      host:
+        from_secret: hetzner_host
+      username: deploy
+      key:
+        from_secret: deploy_ssh_key
+      source: bundle/*
+      target: /opt/littleduck-api-staging
+      strip_components: 1
+
+  - name: deploy
+    image: appleboy/drone-ssh:1.8.0
+    settings:
+      host:
+        from_secret: hetzner_host
+      username: deploy
+      key:
+        from_secret: deploy_ssh_key
+      command_timeout: 5m
+      script:
+        - sh /opt/littleduck-api-staging/remote-deploy.sh /opt/littleduck-api-staging docker-compose.staging.yml littleduck-api-staging
+
+  - name: smoke
+    image: curlimages/curl:8.11.1
+    environment:
+      API_STAGING_HOST:
+        from_secret: api_staging_host
+    commands:
+      - sh deploy/ci/smoke-backend.sh "https://$$API_STAGING_HOST"
+
+  - name: cleanup
+    image: docker:27.5.1-cli
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    commands:
+      - ref=$$(cat .image-ref 2>/dev/null) || exit 0; repo=$${ref%:*}; version=$$(sh deploy/ci/backend-version.sh)
+      - docker image rm -f "$$ref" "$$repo:$$version" "$$repo:latest" || true
+    when:
+      status:
+        - success
+        - failure
+
+volumes:
+  - name: dockersock
+    host:
+      path: /var/run/docker.sock
+  - name: trivy-cache
+    host:
+      path: /var/cache/drone-trivy
+
+---
+kind: pipeline
+type: docker
+name: cd-backend-production
+
+trigger:
+  event:
+    - promote
+  target:
+    - production
+
+steps:
+  - name: verify-build
+    image: alpine:3.21
+    commands:
+      - apk add -q curl jq
+      - sh deploy/ci/verify-commit-status.sh "${DRONE_REPO}" "${DRONE_COMMIT_SHA}"
+
+  - name: bundle
+    image: alpine:3.21
+    environment:
+      API_HOST:
+        from_secret: api_host
+    commands:
+      - apk add -q gettext
+      - sh deploy/ci/image-ref.sh > .image-ref
+      - sh deploy/ci/backend-bundle.sh production
+
+  - name: upload
+    image: appleboy/drone-scp:1.6.14
+    settings:
+      host:
+        from_secret: hetzner_host
+      username: deploy
+      key:
+        from_secret: deploy_ssh_key
+      source: bundle/*
+      target: /opt/littleduck-api
+      strip_components: 1
+
+  - name: deploy
+    image: appleboy/drone-ssh:1.8.0
+    settings:
+      host:
+        from_secret: hetzner_host
+      username: deploy
+      key:
+        from_secret: deploy_ssh_key
+      command_timeout: 5m
+      script:
+        - sh /opt/littleduck-api/remote-deploy.sh /opt/littleduck-api docker-compose.prod.yml littleduck-api
+
+  - name: smoke
+    image: curlimages/curl:8.11.1
+    environment:
+      API_HOST:
+        from_secret: api_host
+    commands:
+      - sh deploy/ci/smoke-backend.sh "https://$$API_HOST"
+
+---
+kind: pipeline
+type: docker
+name: cd-frontend-preview
+
+trigger:
+  branch:
+    - main
+  event:
+    - push
+
+depends_on:
+  - ci-frontend
+
+steps:
+  - name: deploy-preview
+    image: node:20-alpine
+    environment:
+      NEXT_TELEMETRY_DISABLED: "1"
+      VERCEL_TOKEN:
+        from_secret: vercel_token
+      VERCEL_ORG_ID:
+        from_secret: vercel_org_id
+      VERCEL_PROJECT_ID:
+        from_secret: vercel_project_id
+      VERCEL_BYPASS_SECRET:
+        from_secret: vercel_bypass_secret
+    commands:
+      - sh deploy/ci/vercel-deploy.sh preview
+
+---
+kind: pipeline
+type: docker
+name: cd-frontend-production
+
+trigger:
+  event:
+    - promote
+  target:
+    - production
+
+steps:
+  - name: verify-build
+    image: alpine:3.21
+    commands:
+      - apk add -q curl jq
+      - sh deploy/ci/verify-commit-status.sh "${DRONE_REPO}" "${DRONE_COMMIT_SHA}"
+
+  - name: deploy-production
+    image: node:20-alpine
+    environment:
+      NEXT_TELEMETRY_DISABLED: "1"
+      VERCEL_TOKEN:
+        from_secret: vercel_token
+      VERCEL_ORG_ID:
+        from_secret: vercel_org_id
+      VERCEL_PROJECT_ID:
+        from_secret: vercel_project_id
+      FRONTEND_HOST:
+        from_secret: frontend_host
+    commands:
+      - sh deploy/ci/vercel-deploy.sh production

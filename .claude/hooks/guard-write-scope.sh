@@ -8,6 +8,8 @@
 # 放行 exit 0；拒絕 exit 2，stderr 回饋給 Agent。
 #   hyuse：只能寫 openspec/ 目錄內的檔案
 #   osamu：只能寫變更目錄（含已歸檔）的 handoff.md、.linear.md，以及歸檔時同步的 openspec/specs/**
+#   chika：（本專案：單一 repo）只能寫 backend/ 與進行中的變更目錄 openspec/changes/<id>/
+#   yuma ：（本專案：單一 repo）只能寫 frontend/ 與進行中的變更目錄 openspec/changes/<id>/
 # 已知缺口：管不到 Bash 寫檔，由 Agent 定義檔明文禁止。
 set -euo pipefail
 
@@ -27,9 +29,9 @@ deny() {
 }
 
 case "$role" in
-    hyuse|osamu) ;;
+    hyuse|osamu|chika|yuma) ;;
     *)
-        echo "guard-write-scope.sh：未知角色「${role}」，應為 hyuse 或 osamu" >&2
+        echo "guard-write-scope.sh：未知角色「${role}」，應為 hyuse、osamu、chika 或 yuma" >&2
         exit 2
         ;;
 esac
@@ -58,5 +60,14 @@ case "$role" in
         # 歸檔時同步的主規格
         [[ "$file_path" == */openspec/specs/* ]] && exit 0
         deny "integrator 不修改程式碼與提案檔（tasks.md／proposal.md／design.md／openapi.yaml）；發現問題請寫進 handoff.md 退回對應 Agent。"
+        ;;
+    chika|yuma)
+        # 本專案前後端在同一個 repo，兩個開發 Agent 共用一份 worktree，以子目錄劃分寫入範圍
+        if [[ "$role" == chika ]]; then own_dir=backend; other=Yuma; else own_dir=frontend; other=Chika; fi
+        [[ "$file_path" == */"$own_dir"/* ]] && exit 0
+        # 進行中的變更目錄（tasks.md 勾選、handoff.md、openapi.yaml 定稿）；已歸檔的不可改
+        [[ "$file_path" =~ /openspec/changes/archive/ ]] && deny "已歸檔的變更目錄不可修改。"
+        [[ "$file_path" =~ /openspec/changes/[^/]+/ ]] && exit 0
+        deny "${role} 只能寫入 ${own_dir}/ 與 openspec/changes/<change-id>/；另一端的檔案由 ${other} 負責，需要改動請寫進 handoff.md。"
         ;;
 esac

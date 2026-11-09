@@ -1,0 +1,39 @@
+# deploy/edge/drone.conf.template
+# Drone server 的 Nginx 站台：CD 以 envsubst 只帶入 ${DRONE_HOST} 後放到主機 /opt/edge-sites/，由 mygo 的 Nginx include
+
+server {
+    listen 80;
+    server_name ${DRONE_HOST};
+
+    # certbot webroot 驗證路徑（與 mygo 共用 /var/www/certbot）
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    server_name ${DRONE_HOST};
+
+    ssl_certificate     /etc/letsencrypt/live/${DRONE_HOST}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DRONE_HOST}/privkey.pem;
+
+    # 以變數＋resolver 延後解析，Drone 容器重建換 IP 或尚未啟動時 Nginx 仍能啟動（同 mygo 的作法）
+    resolver 127.0.0.11 valid=10s;
+    set $drone_upstream littleduck-drone-server:80;
+
+    location / {
+        proxy_pass http://$drone_upstream;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # 建置記錄以長連線串流
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_read_timeout 3600s;
+    }
+}

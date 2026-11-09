@@ -5,7 +5,8 @@ services:
   api:
     build: .
     ports:
-      - "8080:8080"
+      # 主機埠可用 API_PORT 覆寫（預設 8080），本機 8080 被佔用或要並行檢查時使用
+      - "${API_PORT:-8080}:8080"
     environment:
       PORT: "8080"
       GIN_MODE: release

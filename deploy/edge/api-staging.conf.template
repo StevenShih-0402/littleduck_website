@@ -1,0 +1,37 @@
+# deploy/edge/api-staging.conf.template
+# 後端 Staging 的 Nginx 站台：CD 以 envsubst 只帶入 ${API_STAGING_HOST} 後放到主機 /opt/edge-sites/，由 mygo 的 Nginx include
+
+server {
+    listen 80;
+    server_name ${API_STAGING_HOST};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    server_name ${API_STAGING_HOST};
+
+    client_max_body_size 5m;
+
+    ssl_certificate     /etc/letsencrypt/live/${API_STAGING_HOST}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${API_STAGING_HOST}/privkey.pem;
+
+    # upstream 用 container_name（backend/docker-compose.staging.yml），理由同 api.conf.template
+    resolver 127.0.0.11 valid=10s;
+    set $api_upstream littleduck-api-staging:8080;
+
+    location / {
+        proxy_pass http://$api_upstream;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

@@ -12,7 +12,7 @@
 | 路徑 | 內容 |
 |---|---|
 | `./` | `openspec/` 規格與變更文件、`CLAUDE.md`、本 README |
-| `./frontend/` | Next.js（App Router）+ React 18 + Tailwind CSS 前端 |
+| `./frontend/` | Next.js 16（App Router）+ React 19 + Tailwind CSS 前端 |
 | `./backend/` | Go（Gin + GORM）RESTful API + PostgreSQL + Docker |
 
 ## 快速開始
@@ -48,6 +48,13 @@ docker compose up --build    # api + PostgreSQL 16
 ```
 
 首次啟動步驟、手機端操作與限制見 [docs/remote-control.md](docs/remote-control.md)。
+
+### CI/CD
+
+以自架的 Drone 跑 CI（PR 與 `main` 推送時檢查前後端）與 CD（後端部署到 Hetzner、前端部署到 Vercel；先上 Staging／Preview，在 Drone promote 後才上 Production），設定在 `.drone.yml`。
+
+- 流水線階段、門檻與本機執行 CI 的方式：[docs/cicd.md](docs/cicd.md)
+- 初次建置、日常發布與回滾：[docs/deployment-runbook.md](docs/deployment-runbook.md)
 
 ## 規格文件
 
