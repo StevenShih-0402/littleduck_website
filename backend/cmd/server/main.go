@@ -14,10 +14,10 @@ import (
 	"littleduck-backend/internal/router"
 )
 
-//	@title			LittleDuck API
-//	@version		0.1.0
-//	@description	LittleDuck 個人網站後端 RESTful API
-//	@BasePath		/
+// @title			LittleDuck API
+// @version		0.1.0
+// @description	LittleDuck 個人網站後端 RESTful API
+// @BasePath		/
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
