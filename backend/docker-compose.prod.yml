@@ -1,0 +1,69 @@
+# backend/docker-compose.prod.yml
+# 後端 Production：api＋PostgreSQL 16，由 Drone CD 同步到 Hetzner 主機的 /opt/littleduck-api 後以 GHCR 映像啟動
+
+# 主機前置（見 docs/deployment-runbook.md「後端主機初次建置」）：
+#   - 同目錄放好 .env（欄位見 backend/.env.example，GIN_MODE=release；DB_HOST 由本檔指定，不必填）
+#   - 外部網路 mygo-edge 已存在
+# 啟動時由 CD 帶入 LITTLEDUCK_API_IMAGE（GHCR 的 <version>-<sha> 不可變 tag）。
+# container_name 一律加 littleduck- 前綴：mygo-edge 上以容器名解析，不可與 mygo 或 Staging 重複。
+
+name: littleduck-api
+
+services:
+  api:
+    image: ${LITTLEDUCK_API_IMAGE:?LITTLEDUCK_API_IMAGE 未設定}
+    container_name: littleduck-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      # 執行映像是 alpine，用 busybox 的 wget；/health 會一併檢查資料庫連線
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks:
+      - default
+      - mygo-edge
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+  db:
+    image: postgres:16
+    container_name: littleduck-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:?DB_USER 未設定}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD 未設定}
+      POSTGRES_DB: ${DB_NAME:?DB_NAME 未設定}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    # 資料庫只在本 project 的 default 網路，不加入 mygo-edge
+    networks:
+      - default
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+
+volumes:
+  pgdata:
+
+networks:
+  mygo-edge:
+    external: true

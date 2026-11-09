@@ -1,0 +1,64 @@
+# backend/docker-compose.staging.yml
+# 後端 Staging：api＋PostgreSQL 16，由 Drone CD 同步到 Hetzner 主機的 /opt/littleduck-api-staging 後以 GHCR 映像啟動
+
+# 與 Production（docker-compose.prod.yml）完全獨立：不同的 project、容器名、資料庫 volume 與 .env，
+# 敏感值不可與 Production 共用。資源上限比 Production 低，避免排擠同主機上的線上服務。
+
+name: littleduck-api-staging
+
+services:
+  api:
+    image: ${LITTLEDUCK_API_IMAGE:?LITTLEDUCK_API_IMAGE 未設定}
+    container_name: littleduck-api-staging
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks:
+      - default
+      - mygo-edge
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+
+  db:
+    image: postgres:16
+    container_name: littleduck-db-staging
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:?DB_USER 未設定}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD 未設定}
+      POSTGRES_DB: ${DB_NAME:?DB_NAME 未設定}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - default
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+
+volumes:
+  pgdata:
+
+networks:
+  mygo-edge:
+    external: true

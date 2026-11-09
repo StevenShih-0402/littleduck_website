@@ -7,3 +7,13 @@
 .idea/
 .vscode/
 .DS_Store
+
+# 主機部署用的環境變數檔（範本為各目錄的 .env.example）
+deploy/**/.env
+
+# Drone CD 在工作區產生的暫存檔（見 deploy/ci/）
+/bundle/
+/.image-ref
+
+# Vercel CLI 的本機連結資訊（vercel link／vercel pull 產生）
+.vercel/
