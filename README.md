@@ -39,6 +39,16 @@ docker compose up --build    # api + PostgreSQL 16
 
 詳細架構與環境變數見 [backend/README.md](backend/README.md)。
 
+### Remote Control
+
+想在手機上監看 Claude Code 的進度、派新任務給本機時：
+
+```bash
+.claude/scripts/remote-control.sh start   # 在背景 tmux 啟動 server；status／stop／attach 查詢、停止、接回
+```
+
+首次啟動步驟、手機端操作與限制見 [docs/remote-control.md](docs/remote-control.md)。
+
 ## 規格文件
 
 功能規格與變更提案以 [OpenSpec](https://github.com/Fission-AI/OpenSpec) 管理，位於 `openspec/`：
