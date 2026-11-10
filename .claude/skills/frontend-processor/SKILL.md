@@ -1,13 +1,13 @@
 ---
 name: frontend-processor
-description: 多 Agent 流程的前端實作（Yuma）：讀 OpenSpec 變更目錄的 proposal／design／openapi.yaml／tasks 的 [FE] 項 → 在前端 worktree 實作（後端未定稿時依 openapi.yaml 以型別與 mock 先行），每完成一項 [FE] 任務即 WIP commit 並 push → lint／typecheck／test → 更新 handoff.md；支援中斷後的接續模式。不開 PR、不歸檔。Use when the frontend agent is dispatched by /ship-issue, or the user asks to run /frontend-processor on a change-id.
+description: 多 Agent 流程的前端實作（Fujimori）：讀 OpenSpec 變更目錄的 proposal／design／openapi.yaml／tasks 的 [FE] 項 → 在前端 worktree 實作（後端未定稿時依 openapi.yaml 以型別與 mock 先行），每完成一項 [FE] 任務即 WIP commit 並 push → lint／typecheck／test → 更新 handoff.md；支援中斷後的接續模式。不開 PR、不歸檔。Use when the frontend agent is dispatched by /ship-issue, or the user asks to run /frontend-processor on a change-id.
 ---
 
 # Skill: Frontend Processor
 
 多 Agent 流程的**前端實作棒**（流程總覽見 team-hq 的 `CLAUDE.md` 與 `docs/multi-agent-workflow.md`），結構與後端的 `backend-processor` 對稱。
 
-**呼叫方式**：由 `/ship-issue` 派前端 Agent，或在 team-hq 啟動的 session 中指名「Yuma 執行 /frontend-processor `<change-id>`」。
+**呼叫方式**：由 `/ship-issue` 派前端 Agent，或在 team-hq 啟動的 session 中指名「Fujimori 執行 /frontend-processor `<change-id>`」。
 
 ## 輸入
 

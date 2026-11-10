@@ -10,7 +10,7 @@ description: 多 Agent 流程的 integrator。分四段：「檢查」實際跑�
 本 skill 對應單人流程 `issue-processor` 的步驟 5 與 `issue-solver`，有幾個刻意的差異：
 
 - **先開 PR、後歸檔**：單人流程是先歸檔再開 PR；這裡先開 PR 讓主對話跑 PR 中檢查（CI、`/code-review`、`/security-review`、風險審批），全部通過後才歸檔並追加歸檔 commit。
-- **中間有審查**：「檢查」通過後不立刻重切、開 PR，而是設 `reviewing` 並停下，由主對話派 Shiori 做 PR 前審查；通過後才派本 skill「收尾」。
+- **中間有審查**：「檢查」通過後不立刻重切、開 PR，而是設 `reviewing` 並停下，由主對話派 Akafuku 做 PR 前審查；通過後才派本 skill「收尾」。
 - **重切 commit**：開發 Agent 每完成一項任務就推送一筆 WIP commit；收尾時，由本 skill 把它們重切成依功能分組的 commit。
 - **合併也是這裡做**：歸檔後由本 skill 模擬合併隊列並合併 PR。
 

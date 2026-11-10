@@ -9,10 +9,10 @@ description: 多 Agent 流程第一棒（architect）：讀 Linear issue → 系
 
 | 階段 | 負責 | 流程步驟 |
 |------|------|----------|
-| **1. issue → 提案**（本 skill） | architect（Hyuse） | 本檔 |
-| 2. 後端實作 | backend（Chika） | 後端 repo 的 `/backend-processor` |
-| 3. 前端實作 | frontend（Yuma） | `/frontend-processor` |
-| 4. 檢查、PR、歸檔 | integrator（Osamu） | `/issue-integrator` |
+| **1. issue → 提案**（本 skill） | architect（Hikaru） | 本檔 |
+| 2. 後端實作 | backend（Yasumi） | 後端 repo 的 `/backend-processor` |
+| 3. 前端實作 | frontend（Fujimori） | `/frontend-processor` |
+| 4. 檢查、PR、歸檔 | integrator（Teshima） | `/issue-integrator` |
 
 本 skill 對應單人流程的 `issue-reader`，差別在於：
 
@@ -75,16 +75,16 @@ openspec instructions <artifact> --change <change-id> --json   # 取各 artifact
 
 ### design.md：執行驗證觀察點
 
-每一端的 `design.md` 都要有一節 `## 執行驗證觀察點`，列出**跑起產品後能證明本次變更有效**的觀察點。Osamu「檢查」時會跟 repo `CLAUDE.md`「## 執行驗證」的通用觀察點一起跑（格式見 team-hq `CLAUDE.md`「執行驗證」）。
+每一端的 `design.md` 都要有一節 `## 執行驗證觀察點`，列出**跑起產品後能證明本次變更有效**的觀察點。Teshima「檢查」時會跟 repo `CLAUDE.md`「## 執行驗證」的通用觀察點一起跑（格式見 team-hq `CLAUDE.md`「執行驗證」）。
 
 - 格式同 repo `CLAUDE.md` 的觀察點，兩種擇一：
   - **指令**：`<指令>` → `<預期輸出>`，後端以這種為主，例：`curl -s localhost:8000/api/v2/orders/export | jq '.data | length'` → `大於 0`；
   - **截圖**：`<截圖指令，輸出寫 {out}>` → `<預期畫面>`，前端以這種為主。截圖指令沿用 repo `CLAUDE.md` 既有的寫法，只換網址。
 - 只寫**本次變更**的行為，不重複 repo 的通用觀察點（例：`/health`）。
-- 預期畫面要**點名具體元素**（標題文字、欄位、按鈕、筆數），不要寫「頁面正常顯示」。Osamu 看圖時只有點名的元素能當判準。
+- 預期畫面要**點名具體元素**（標題文字、欄位、按鈕、筆數），不要寫「頁面正常顯示」。Teshima 看圖時只有點名的元素能當判準。
 - 啟動方式、port、登入狀態以 repo `CLAUDE.md` 為準，不要自創；需要登入才看得到的頁面，repo 沒提供帶登入的截圖方式時改用指令觀察點，或列成待確認問題。
 - 沒有能在執行時觀察的行為（例：只動文件、純重構）：寫「無」並附理由。
-- repo `CLAUDE.md` 沒有「## 執行驗證」段：照樣寫觀察點，並在該節註明「repo 尚未設定執行驗證，Osamu 檢查時會略過」，同時列進**待確認問題**，讓主對話提醒 user 補設定。
+- repo `CLAUDE.md` 沒有「## 執行驗證」段：照樣寫觀察點，並在該節註明「repo 尚未設定執行驗證，Teshima 檢查時會略過」，同時列進**待確認問題**，讓主對話提醒 user 補設定。
 
 ### openapi.yaml：API 契約草稿
 

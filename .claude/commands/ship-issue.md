@@ -1,5 +1,5 @@
 ---
-description: 多 Agent 流程總指揮（littleduck_website 單一 repo：frontend／backend 共用一份 worktree 與一個 PR）：一張 Linear issue 從提案、前後端實作、PR 前兩項檢查（osamu 檢查＋執行驗證、shiori 規格審查）、開 PR、PR 中四項檢查（CI、/code-review、/security-review、按風險審批）到歸檔與合併，全程自動；只在高風險、退回超過上限、衝突等停下條件成立時才停下問 user。
+description: 多 Agent 流程總指揮（littleduck_website 單一 repo：frontend／backend 共用一份 worktree 與一個 PR）：一張 Linear issue 從提案、前後端實作、PR 前兩項檢查（teshima 檢查＋執行驗證、akafuku 規格審查）、開 PR、PR 中四項檢查（CI、/code-review、/security-review、按風險審批）到歸檔與合併，全程自動；只在高風險、退回超過上限、衝突等停下條件成立時才停下問 user。
 argument-hint: <linear-issue-id> [<linear-issue-id> …]
 ---
 
@@ -10,7 +10,7 @@ argument-hint: <linear-issue-id> [<linear-issue-id> …]
 > **littleduck_website 單一 repo 設定**：前端（`frontend/`）與後端（`backend/`）在同一個 repo，team-hq 也是它。下文的「兩端」「每一端」「前端 repo／後端 repo」依 `CLAUDE.md`「單一 repo 設定」解讀：
 > - 第 1 步只建**一份** worktree：在 repo 根目錄執行 `git worktree add -b <branch> wt/<change-id> origin/main`，環境準備是 `cd wt/<change-id>/frontend && npm ci`。
 > - 只有**一份**變更目錄、一份 `handoff.md`／`review.md`／`openapi.yaml`，開**一個** PR，合併一次。
-> - 第 3 步：`repos` 含 backend 時先派 `chika`、完成後再派 `yuma`，兩者帶入同一個 worktree 路徑，**不可平行**（共用 git index）。不需要把 `openapi.yaml` 複製到前端。
+> - 第 3 步：`repos` 含 backend 時先派 `yasumi`、完成後再派 `fujimori`，兩者帶入同一個 worktree 路徑，**不可平行**（共用 git index）。不需要把 `openapi.yaml` 複製到前端。
 > - 第 0 步第 5 點的「兩個 repo 已有同名 change」改為：本 repo 的 `openspec/changes/` 已有同名 change，或已有處理同一張 issue 的 change（例：用 `/issue-reader` 建的）。
 > - 7.1 的 CI 是 Drone，check 名稱 `continuous-integration/drone/pr`；合併後的部署由 Drone CD 處理，不在本流程。
 
@@ -24,7 +24,7 @@ repo 路徑、主幹分支、worktree 慣例、高風險檔案樣式、風險分
 
 | 情況 | 在哪一步 |
 |------|----------|
-| issue 或程式碼釐不清的問題（含 Hyuse 的待確認問題） | 0、2 |
+| issue 或程式碼釐不清的問題（含 Hikaru 的待確認問題） | 0、2 |
 | 規格免同步聲明要確認 | 4 |
 | 同一目標的退回會超過上限 | 見「退回規則」 |
 | 判定為高風險，等 user 回覆「合併」 | 8 |
@@ -34,18 +34,18 @@ repo 路徑、主幹分支、worktree 慣例、高風險檔案樣式、風險分
 
 ## 退回規則
 
-- 同一目標（architect／backend／frontend）**最多退回 2 次**，以兩端 `handoff.md` 的退回紀錄計數。以下來源**合併計算**：Osamu 檢查（4）、PR 前規格審查（5）、CI（7.1）、PR 中評定（7.5）。
+- 同一目標（architect／backend／frontend）**最多退回 2 次**，以兩端 `handoff.md` 的退回紀錄計數。以下來源**合併計算**：Teshima 檢查（4）、PR 前規格審查（5）、CI（7.1）、PR 中評定（7.5）。
 - 第 3 次要退回時停下，向 user 摘要歷次退回原因，等待指示。
 - 同一項發現開發 Agent 已在 `handoff.md` 寫明不採納理由，之後又被回報：停下交給 user。
 - 退回給開發 Agent 時，prompt 帶 `handoff.md`（審查退回時加上 `review.md`）路徑、「**接續模式**」，以及「逐項修正，或在 `handoff.md` 寫明不採納理由」。修完一律回到**第 4 步**。
-- 退回給 Hyuse（需求問題）時，修完回到**第 2 步**的提交提案，再往下走。
+- 退回給 Hikaru（需求問題）時，修完回到**第 2 步**的提交提案，再往下走。
 
 ## 審查輪次（讓審查能結束）
 
 - 每一端的 `review.md` 每輪都記錄「已審到」的 HEAD SHA。
 - **PR 前（第 5 步）**：第 1 輪範圍是 `origin/<base>...HEAD`；第 2 輪起是 `git diff <上一輪已審到的 SHA> HEAD`。
-- **PR 中（第 7 步）**：「已審到」記的是該輪的**收尾 HEAD**（`handoff.md` 最後一節收尾紀錄的值），不是審查當下的 HEAD。第 1 輪範圍是 `origin/<base>...HEAD`；第 2 輪起是 `<上一輪的收尾 HEAD>..HEAD`。PR 開好後 Osamu 收尾只重切收尾 HEAD 之後的 commit，所以它會一直是 HEAD 的祖先，這個範圍成立。
-- 派 Shiori 時一併給前幾輪的 `review.md`，已記錄過、判為不成立、開發者不採納的發現都不再重提。
+- **PR 中（第 7 步）**：「已審到」記的是該輪的**收尾 HEAD**（`handoff.md` 最後一節收尾紀錄的值），不是審查當下的 HEAD。第 1 輪範圍是 `origin/<base>...HEAD`；第 2 輪起是 `<上一輪的收尾 HEAD>..HEAD`。PR 開好後 Teshima 收尾只重切收尾 HEAD 之後的 commit，所以它會一直是 HEAD 的祖先，這個範圍成立。
+- 派 Akafuku 時一併給前幾輪的 `review.md`，已記錄過、判為不成立、開發者不採納的發現都不再重提。
 
 ---
 
@@ -65,11 +65,11 @@ repo 路徑、主幹分支、worktree 慣例、高風險檔案樣式、風險分
 
 依 team-hq `CLAUDE.md`「Worktree 慣例」，為 `repos` 列出的每一端，從該端主幹建立 worktree 與分支（`git worktree add -b <branch> <wt-root>/<repo>-<change-id> origin/<主幹>`），並依該端 `CLAUDE.md` 完成環境準備（例：安裝依賴、連結本機設定檔）。失敗就停下回報。
 
-## 2. 提案 → hyuse，提交提案
+## 2. 提案 → hikaru，提交提案
 
-派 `hyuse`，prompt 帶入：主 issue、sub-issue、code、label、分支名、change-id、`repos`、兩端 worktree 路徑。
+派 `hikaru`，prompt 帶入：主 issue、sub-issue、code、label、分支名、change-id、`repos`、兩端 worktree 路徑。
 
-Hyuse 回傳後，若有「待確認問題」，就問 user，把答案再派給 Hyuse 修正，直到沒有待確認問題。
+Hikaru 回傳後，若有「待確認問題」，就問 user，把答案再派給 Hikaru 修正，直到沒有待確認問題。
 
 沒有待確認問題時，**不等 user 核准**，直接在每一端執行以下步驟，任一步失敗就停下：
 
@@ -79,45 +79,45 @@ Hyuse 回傳後，若有「待確認問題」，就問 user，把答案再派給
 
 開發 Agent 開工時會檢查 worktree 是否乾淨，所以提案一定要先提交。接著向 user 用一兩句話說明提案重點與 `[BE]`／`[FE]` 任務數（**只是告知，不等回覆**），進第 3 步。
 
-## 3. 實作 → chika、yuma
+## 3. 實作 → yasumi、fujimori
 
 先依序派工，穩定後再考慮平行：
 
-1. `repos` 含 backend 時，派 `chika`，帶入 change-id、後端 worktree 路徑、前端 worktree 與其變更目錄路徑。定稿的 `openapi.yaml` 要複製到前端，並在前端 worktree 只 commit 這一個檔案。
-2. `repos` 含 frontend 時，派 `yuma`，帶入 change-id、前端 worktree 路徑。派之前確認前端 worktree 乾淨（`git status --porcelain` 為空）。
+1. `repos` 含 backend 時，派 `yasumi`，帶入 change-id、後端 worktree 路徑、前端 worktree 與其變更目錄路徑。定稿的 `openapi.yaml` 要複製到前端，並在前端 worktree 只 commit 這一個檔案。
+2. `repos` 含 frontend 時，派 `fujimori`，帶入 change-id、前端 worktree 路徑。派之前確認前端 worktree 乾淨（`git status --porcelain` 為空）。
 
 開發 Agent 中途停下（額度用完、push 失敗、服務未啟動等），處理完原因後重派同一個 Agent，prompt 加上「**接續模式**」。它會先重跑最後一項已勾任務的驗證，再從第一個未勾選的任務繼續；狀態區塊已是 `integrating` 的那一端不再派。
 
-任一 Agent 回報「要退回 Hyuse」（需求不明、無法實作）時，依「退回規則」處理。
+任一 Agent 回報「要退回 Hikaru」（需求不明、無法實作）時，依「退回規則」處理。
 
-## 4. PR 前 ①：確保正常運行 → osamu「檢查」
+## 4. PR 前 ①：確保正常運行 → teshima「檢查」
 
-派 `osamu`，帶入：change-id、兩端 worktree 路徑、兩端主幹分支、「**檢查**」。Osamu 會實際跑測試、lint、typecheck、migration 與 `openspec validate`，並依各端 `CLAUDE.md` 的「## 執行驗證」與 `design.md` 的「## 執行驗證觀察點」把產品跑起來觀察，含指令與截圖觀察點（沒設定就記錄略過）。
+派 `teshima`，帶入：change-id、兩端 worktree 路徑、兩端主幹分支、「**檢查**」。Teshima 會實際跑測試、lint、typecheck、migration 與 `openspec validate`，並依各端 `CLAUDE.md` 的「## 執行驗證」與 `design.md` 的「## 執行驗證觀察點」把產品跑起來觀察，含指令與截圖觀察點（沒設定就記錄略過）。
 
-- **退回**：Osamu 會回報退回對象與第 N 次（被退回那一端的狀態區塊已由 Osamu 改回並 push）。依「退回規則」處理。
-- **通過**：Osamu 已把各端狀態區塊改為 `reviewing`。
-  - Osamu 回報了**規格免同步聲明**時，用 AskUserQuestion 逐條請 user 確認（列出目標、觸發路徑、理由）。user 不同意任何一條，就視同檢查失敗：在該端 `handoff.md` 追加退回紀錄、階段改回開發階段，依「退回規則」退回該端開發 Agent。
+- **退回**：Teshima 會回報退回對象與第 N 次（被退回那一端的狀態區塊已由 Teshima 改回並 push）。依「退回規則」處理。
+- **通過**：Teshima 已把各端狀態區塊改為 `reviewing`。
+  - Teshima 回報了**規格免同步聲明**時，用 AskUserQuestion 逐條請 user 確認（列出目標、觸發路徑、理由）。user 不同意任何一條，就視同檢查失敗：在該端 `handoff.md` 追加退回紀錄、階段改回開發階段，依「退回規則」退回該端開發 Agent。
   - 沒有聲明，或 user 全部同意 → 進第 5 步。
 
-## 5. PR 前 ②：檢查代碼品質 → shiori「審查模式」
+## 5. PR 前 ②：檢查代碼品質 → akafuku「審查模式」
 
 本步驟**不跑 `/code-review`**（它在第 7 步對 PR 跑）。對 `repos` 每一端，在這一步內依序做完，**中途不寫 `review.md`**（中斷時只會留下被 ignore 的 patch）：
 
-1. **產生 patch**：先 `git -C <worktree> fetch origin <base>`，再依「審查輪次」決定範圍，寫到 `<worktree>/openspec/changes/<change-id>/review-diff.patch`。Shiori 沒有 Bash、看不到 git diff，所以由你先產生；此檔已列入各 repo 的 `.gitignore`，不進 commit。
-2. **派 Shiori**：變更含 delta specs 時，**一次**派 `shiori`，prompt 帶：「**審查模式**」、change-id、`repos` 每一端的 worktree 路徑與變更目錄路徑（含 `review-diff.patch`）、前幾輪的 `review.md`（第 1 輪寫「無」）。純小改沒有 delta spec 時不派，本輪記為「未派（無 delta spec）」並視為通過。
-3. **寫 `review.md`**：依 team-hq `openspec/review-template.md`，在每一端變更目錄的 `review.md` 追加「第 N 輪 — PR 前」（檔案不存在就從範本建立），每條發現一列。處理欄：Shiori 評為「高嚴重度且高信心」的標「退回」，判為不成立的標「不成立」並附理由，其餘標「PR 備註」。
+1. **產生 patch**：先 `git -C <worktree> fetch origin <base>`，再依「審查輪次」決定範圍，寫到 `<worktree>/openspec/changes/<change-id>/review-diff.patch`。Akafuku 沒有 Bash、看不到 git diff，所以由你先產生；此檔已列入各 repo 的 `.gitignore`，不進 commit。
+2. **派 Akafuku**：變更含 delta specs 時，**一次**派 `akafuku`，prompt 帶：「**審查模式**」、change-id、`repos` 每一端的 worktree 路徑與變更目錄路徑（含 `review-diff.patch`）、前幾輪的 `review.md`（第 1 輪寫「無」）。純小改沒有 delta spec 時不派，本輪記為「未派（無 delta spec）」並視為通過。
+3. **寫 `review.md`**：依 team-hq `openspec/review-template.md`，在每一端變更目錄的 `review.md` 追加「第 N 輪 — PR 前」（檔案不存在就從範本建立），每條發現一列。處理欄：Akafuku 評為「高嚴重度且高信心」的標「退回」，判為不成立的標「不成立」並附理由，其餘標「PR 備註」。
 4. **狀態與 commit**：
-   - 沒有要退回的：每一端狀態區塊維持 `reviewing`，最後完成改「PR 前審查」、下一步「Osamu 收尾」；結果「通過」。
+   - 沒有要退回的：每一端狀態區塊維持 `reviewing`，最後完成改「PR 前審查」、下一步「Teshima 收尾」；結果「通過」。
    - 有要退回的：被退回那一端改回 `backend`／`frontend`（暫停原因「PR 前審查退回第 N 次」），其他端改回 `integrating`；結果「退回第 N 次」，並在被退回那一端 `handoff.md` 追加退回紀錄。
    - 每一端只 `git add` 變更目錄的 `review.md` 與 `handoff.md`，commit `wip(<ISSUE-ID>): PR 前審查第 N 輪` 並一般 push；然後刪除 `review-diff.patch`。
 5. 有退回就依「退回規則」處理；沒有就進第 6 步。
 
-## 6. 收尾、開 PR → osamu「收尾」
+## 6. 收尾、開 PR → teshima「收尾」
 
-派 `osamu`，帶入：change-id、兩端 worktree 路徑、兩端主幹分支、「**收尾**」。
+派 `teshima`，帶入：change-id、兩端 worktree 路徑、兩端主幹分支、「**收尾**」。
 
-- Osamu 回報「需重新檢查」（檢查之後除 `handoff.md`、`review.md` 外還有變動）→ 回到第 4 步。
-- **完成**：Osamu 已重切 commit（PR 已存在時只重切上次收尾之後的 commit）、以 `--force-with-lease` 推送、開好或沿用 PR（內文附 `review.md` 的 PR 備註），並把兩端狀態區塊改為 `pr-checking` → 進第 7 步。
+- Teshima 回報「需重新檢查」（檢查之後除 `handoff.md`、`review.md` 外還有變動）→ 回到第 4 步。
+- **完成**：Teshima 已重切 commit（PR 已存在時只重切上次收尾之後的 commit）、以 `--force-with-lease` 推送、開好或沿用 PR（內文附 `review.md` 的 PR 備註），並把兩端狀態區塊改為 `pr-checking` → 進第 7 步。
 
 ## 7. PR 中四項檢查（主對話執行）
 
@@ -147,9 +147,9 @@ Hyuse 回傳後，若有「待確認問題」，就問 user，把答案再派給
 1. 用 `git -C <worktree> symbolic-ref --short refs/remotes/origin/HEAD` 取得 `origin` 預設分支。它等於該端主幹時，用 Bash 在 worktree 目錄以非互動模式執行：`cd <worktree> && timeout 1200 claude -p "/security-review"`，取 stdout 作為發現。
 2. 預設分支不等於主幹、指令失敗或沒有輸出時，**不另外跑**：7.2 對高風險端本來就用 `high` effort，以它代替，並在 `review.md` 記「security-review 不可用，以 /code-review high 代替：<原因>」。
 
-### 7.4 評定 → shiori「評定模式」
+### 7.4 評定 → akafuku「評定模式」
 
-所有端的 7.2、7.3 都完成後，**一次**派 `shiori`，prompt 帶：「**評定模式**」、change-id、`repos` 每一端的 worktree 路徑與變更目錄路徑、本輪範圍的 `review-diff.patch`（產生方式同第 5 步）、各端 `/code-review` 與 `/security-review` 的發現全文（沒有就寫「無」）、前幾輪的 `review.md`。
+所有端的 7.2、7.3 都完成後，**一次**派 `akafuku`，prompt 帶：「**評定模式**」、change-id、`repos` 每一端的 worktree 路徑與變更目錄路徑、本輪範圍的 `review-diff.patch`（產生方式同第 5 步）、各端 `/code-review` 與 `/security-review` 的發現全文（沒有就寫「無」）、前幾輪的 `review.md`。
 
 兩端的 `/code-review` 與 `/security-review` 都沒有任何發現時，可以不派，本輪記為「無發現」。
 
@@ -174,21 +174,21 @@ Hyuse 回傳後，若有「待確認問題」，就問 user，把答案再派給
 - **高**：
   1. 兩端狀態區塊改為 `awaiting-approval`，暫停原因「高風險，等待 user 回覆合併」；只 commit `handoff.md`、`review.md`，訊息 `wip(<ISSUE-ID>): 等待高風險審批`，一般 push。
   2. 向 user 摘要：判定為高風險的原因（命中的檔案樣式、破壞性 API 變更、成立的安全發現）、逐一列出高風險檔案、兩端 PR 連結、`review.md` 最後一輪的 PR 備註、`handoff.md` 中的風險項與執行驗證結果。請 user 看過這些檔案的 diff 後回覆「合併」。
-  3. user 回覆「合併」→ 進第 9 步。user 要求修改 → 依內容派給 Chika／Yuma（實作）或 Hyuse（需求），算一次退回，修完回到第 4 步。**沒有明確回覆「合併」前，不得往下。**
+  3. user 回覆「合併」→ 進第 9 步。user 要求修改 → 依內容派給 Yasumi／Fujimori（實作）或 Hikaru（需求），算一次退回，修完回到第 4 步。**沒有明確回覆「合併」前，不得往下。**
 
-## 9. 歸檔 → osamu「歸檔」
+## 9. 歸檔 → teshima「歸檔」
 
-派 `osamu`，帶入：change-id、兩端 worktree 路徑、兩端主幹分支、「**歸檔**，PR 中檢查已通過」，高風險時再加「user 已回覆合併」。
+派 `teshima`，帶入：change-id、兩端 worktree 路徑、兩端主幹分支、「**歸檔**，PR 中檢查已通過」，高風險時再加「user 已回覆合併」。
 
-Osamu 會歸檔兩端（同步規格）、追加歸檔 commit、回寫 Linear。失敗就停下回報 user。
+Teshima 會歸檔兩端（同步規格）、追加歸檔 commit、回寫 Linear。失敗就停下回報 user。
 
-## 10. 合併 → osamu「合併」
+## 10. 合併 → teshima「合併」
 
-派 `osamu`，帶入：change-id、兩端 worktree 路徑、兩端主幹分支、兩端 PR 網址、「**合併**」。
+派 `teshima`，帶入：change-id、兩端 worktree 路徑、兩端主幹分支、兩端 PR 網址、「**合併**」。
 
-Osamu 會模擬合併隊列：兩端各自 rebase 到最新主幹、重跑檢查、等 CI；兩端都綠才依「後端 → 前端」合併，並同步 sub-issue 狀態。
+Teshima 會模擬合併隊列：兩端各自 rebase 到最新主幹、重跑檢查、等 CI；兩端都綠才依「後端 → 前端」合併，並同步 sub-issue 狀態。
 
-- **rebase 衝突、rebase 後檢查或 CI 失敗**：Osamu 不會合併任何一端。**停下交給 user**，摘要失敗原因與衝突檔案。change 已歸檔，不退回開發 Agent。
+- **rebase 衝突、rebase 後檢查或 CI 失敗**：Teshima 不會合併任何一端。**停下交給 user**，摘要失敗原因與衝突檔案。change 已歸檔，不退回開發 Agent。
 - **只合併了一端**（例：前端合併時主幹又前進且重排失敗）：停下回報哪一端已合併、哪一端沒有。
 
 ## 11. 最終報告
@@ -204,4 +204,4 @@ Osamu 會模擬合併隊列：兩端各自 rebase 到最新主幹、重跑檢查
 
 ---
 
-**小 issue 的捷徑**（只動單一 repo、沒有 API 變更）：`repos` 只填那一端，Hyuse 的 `openapi.yaml` 寫 `paths: {}`，第 3 步只派那一端的開發 Agent；第 5 步沒有 delta spec 時不派 Shiori。其餘步驟照常，PR 中四項檢查不省略。
+**小 issue 的捷徑**（只動單一 repo、沒有 API 變更）：`repos` 只填那一端，Hikaru 的 `openapi.yaml` 寫 `paths: {}`，第 3 步只派那一端的開發 Agent；第 5 步沒有 delta spec 時不派 Akafuku。其餘步驟照常，PR 中四項檢查不省略。
