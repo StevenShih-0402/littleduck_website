@@ -9,26 +9,35 @@ import { Lake } from "@/store/lake";
 import StatusPill from "./status-pill";
 
 export default function AdminPosts({ openEditor }) {
-  const { db, update } = useLake();
+  const { db, createArticle, updateArticle, deleteArticle } = useLake();
   const [filter, setFilter] = React.useState("all");
+  const [busy, setBusy] = React.useState(false);
   const list = db.articles.filter(a => filter === "all" ? true : a.status === filter);
 
-  const toggle = id => update(d => {
-    const a = d.articles.find(x => x.id === id);
-    if (a) a.status = a.status === "published" ? "draft" : "published";
-    return d;
-  });
-  const del = id => {
-    if (!confirm("刪除這篇文章？")) return;
-    update(d => { d.articles = d.articles.filter(x => x.id !== id); return d; });
+  const toggle = async (id, status) => {
+    const next = status === "published" ? "draft" : "published";
+    await updateArticle(id, { status: next });
   };
-  const create = () => {
-    const id = Lake.uid();
-    update(d => {
-      d.articles.unshift({ id, title: "未命名文章", cat: (d.settings.catsBlog || ["隨筆"])[0], date: Lake.today(), y: 2026, status: "draft", views: 0, blurb: "", award: "", banner: "", bannerFade: false, showcase: false, workCat: "", gallery: [], body: "" });
-      return d;
-    });
-    openEditor(id);
+  const del = async id => {
+    if (!confirm("刪除這篇文章？")) return;
+    await deleteArticle(id);
+  };
+  const create = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const settings = db.settings || {};
+      const created = await createArticle({
+        title: "未命名文章",
+        cat: (settings.catsBlog || ["隨筆"])[0],
+        date: Lake.today(), y: 2026, status: "draft", views: 0,
+        blurb: "", award: "", banner: "", bannerFade: false,
+        showcase: false, workCat: "", gallery: [], body: "",
+      });
+      if (created && created.id) openEditor(created.id);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -55,7 +64,7 @@ export default function AdminPosts({ openEditor }) {
               <div className="a-dim mono text-[10px] mt-0.5">{a.date} · {a.views} views</div>
             </div>
             <button className="a-btn ntc text-[11px]" onClick={() => openEditor(a.id)}>編輯</button>
-            <button className="a-btn ntc text-[11px]" onClick={() => toggle(a.id)}>{a.status === "published" ? "下架" : "發布"}</button>
+            <button className="a-btn ntc text-[11px]" onClick={() => toggle(a.id, a.status)}>{a.status === "published" ? "下架" : "發布"}</button>
             <button className="a-btn ntc text-[11px] a-dim" onClick={() => del(a.id)}>刪除</button>
           </div>
         ))}

@@ -1,5 +1,5 @@
 // frontend/components/admin/admin-sponsor.jsx
-// 贊助管理：贊助 KPI、贊助視窗設定（標題/副標/金額按鈕）與贊助紀錄列表
+// 贊助管理：贊助 KPI、贊助視窗設定（經 updateSettings 寫回）與唯讀贊助紀錄列表（reloadAdmin 載入）
 
 "use client";
 
@@ -7,15 +7,35 @@ import React from "react";
 import { useLake } from "@/store/lake-context";
 
 export default function AdminSponsor() {
-  const { db, update } = useLake();
-  const sp = db.settings.sponsor;
+  const { db, updateSettings } = useLake();
   const dons = db.donations || [];
-  const set = (k, v) => update(d => { d.settings.sponsor[k] = v; return d; });
-  const setTier = (i, k, v) => update(d => { d.settings.sponsor.tiers[i][k] = v; return d; });
+  // 贊助視窗設定以本機表單狀態編輯，按「儲存設定」才 PUT /settings
+  const [sp, setSp] = React.useState((db.settings && db.settings.sponsor) || { title: "", subtitle: "", tiers: [] });
+  React.useEffect(() => { if (db.settings && db.settings.sponsor) setSp(db.settings.sponsor); }, [db.settings]);
+  const [saved, setSaved] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [err, setErr] = React.useState("");
 
-  const total = dons.reduce((s, x) => s + x.amt, 0);
-  const month = dons.filter(x => x.date.startsWith("2026 / 07"));
-  const monthTotal = month.reduce((s, x) => s + x.amt, 0);
+  const set = (k, v) => setSp(p => ({ ...p, [k]: v }));
+  const setTier = (i, k, v) => setSp(p => ({ ...p, tiers: (p.tiers || []).map((t, idx) => idx === i ? { ...t, [k]: v } : t) }));
+
+  const save = async () => {
+    if (saving) return;
+    setErr(""); setSaving(true);
+    try {
+      await updateSettings({ ...db.settings, sponsor: sp });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      setErr(e.message || "儲存失敗");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const total = dons.reduce((s, x) => s + (x.amt || 0), 0);
+  const month = dons.filter(x => (x.date || "").startsWith("2026 / 07"));
+  const monthTotal = month.reduce((s, x) => s + (x.amt || 0), 0);
   const avg = dons.length ? Math.round(total / dons.length) : 0;
 
   const Kpi = ({ label, v, sub }) => (
@@ -60,7 +80,15 @@ export default function AdminSponsor() {
                 </div>
               ))}
             </div>
-            <div className="a-dim mono text-[10px] mt-1.5">前台贊助視窗即時反映。</div>
+            <div className="a-dim mono text-[10px] mt-1.5">按「儲存設定」後反映到前台贊助視窗。</div>
+          </div>
+          <div className="flex items-center gap-3 pt-1">
+            <button className="a-btn a-btn-acc ntc" onClick={save} disabled={saving}
+              style={saving ? { opacity: .6, cursor: "not-allowed" } : {}}>
+              {saving ? "儲存中…" : "儲存設定"}
+            </button>
+            {saved && <span className="mono text-[11px] a-acc">✓ 已儲存</span>}
+            {err && <span className="mono text-[11px]" style={{ color: "#d14343" }}>✕ {err}</span>}
           </div>
         </div>
         {/* 紀錄 */}

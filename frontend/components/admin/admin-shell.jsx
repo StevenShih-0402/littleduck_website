@@ -14,9 +14,28 @@ import AdminComments from "./admin-comments";
 import AdminSponsor from "./admin-sponsor";
 import AdminSettings from "./admin-settings";
 
-function AdminLogin({ onLogin }) {
+function AdminLogin() {
   const router = useRouter();
+  const { login } = useLake();
+  const [username, setUsername] = React.useState("");
   const [pw, setPw] = React.useState("");
+  const [err, setErr] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+
+  const submit = async () => {
+    if (busy) return;
+    setErr("");
+    setBusy(true);
+    try {
+      await login(username.trim(), pw);
+      // 成功後 authed 由 context 更新，AdminShell 會改渲染主畫面
+    } catch (e) {
+      setErr(e.message || "登入失敗");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="adm adm-neutral flex items-center justify-center min-h-screen px-4">
       <div className="a-panel p-8 w-full max-w-[380px]">
@@ -27,12 +46,19 @@ function AdminLogin({ onLogin }) {
             <div className="a-dim text-[11px] mono">lakeside · admin console</div>
           </div>
         </div>
+        <label className="block text-[12px] font-bold mb-1.5 ntc">管理員帳號</label>
+        <input type="text" className="a-inp mb-3" value={username} placeholder="username" autoFocus
+          onChange={e => setUsername(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && submit()} />
         <label className="block text-[12px] font-bold mb-1.5 ntc">管理員密碼</label>
         <input type="password" className="a-inp mb-2" value={pw} placeholder="••••••••"
           onChange={e => setPw(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && onLogin()} />
-        <div className="a-dim text-[10.5px] mono mb-5">原型示意：任意密碼皆可登入。</div>
-        <button className="a-btn a-btn-acc w-full ntc" onClick={onLogin}>登入後台 →</button>
+          onKeyDown={e => e.key === "Enter" && submit()} />
+        {err && <div className="text-[11px] mono mb-3" style={{ color: "#d14343" }}>✕ {err}</div>}
+        <button className="a-btn a-btn-acc w-full ntc" onClick={submit} disabled={busy}
+          style={busy ? { opacity: .6, cursor: "not-allowed" } : {}}>
+          {busy ? "登入中…" : "登入後台 →"}
+        </button>
         <button className="a-btn w-full mt-2 ntc" onClick={() => router.push("/")}>← 回前台</button>
       </div>
     </div>
@@ -49,19 +75,21 @@ const ADMIN_TABS = [
 ];
 
 export default function AdminShell() {
-  const { db } = useLake();
+  const { db, authed, logout, reloadAdmin } = useLake();
   const router = useRouter();
-  const [authed, setAuthed] = React.useState(false);
   const [tab, setTab] = React.useState("over");
   const [skin, setSkin] = React.useState("neutral");
   const [editId, setEditId] = React.useState(null); // article being edited
   React.useEffect(() => {
-    setAuthed(sessionStorage.getItem("lake_admin") === "1");
     setSkin(localStorage.getItem("lake_admin_skin") || "neutral");
   }, []);
+  // 進入後台時（已登入）確保後台資料（草稿、全部留言、贊助、真實統計）已載入
+  React.useEffect(() => {
+    if (authed) reloadAdmin();
+  }, [authed, reloadAdmin]);
   const setSkinP = s => { setSkin(s); localStorage.setItem("lake_admin_skin", s); };
 
-  if (!authed) return <AdminLogin onLogin={() => { sessionStorage.setItem("lake_admin", "1"); setAuthed(true); }} />;
+  if (!authed) return <AdminLogin />;
 
   const pendingC = db.comments.filter(c => c.status === "pending").length;
   const openEditor = id => { setEditId(id); setTab("editor"); };
@@ -87,7 +115,7 @@ export default function AdminShell() {
             ))}
           </div>
           <button className="a-btn ntc text-[11px]" onClick={() => router.push("/")}>看前台</button>
-          <button className="a-btn ntc text-[11px]" onClick={() => { sessionStorage.removeItem("lake_admin"); setAuthed(false); }}>登出</button>
+          <button className="a-btn ntc text-[11px]" onClick={() => logout()}>登出</button>
         </div>
       </div>
 

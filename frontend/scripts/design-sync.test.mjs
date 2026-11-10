@@ -118,4 +118,48 @@ describe("design-sync", () => {
     mkdirSync(empty);
     assert.throws(() => exec("check", empty), /沒有納入同步範圍/);
   });
+
+  // ── 刻意分歧（SDP-103 store/lake.js 不再追隨 project/v2/store.js） ──
+  describe("刻意分歧（divergent）", () => {
+    const markDivergent = () => {
+      const m = readManifest();
+      m.files["project/v2/ui.jsx"].divergent = true;
+      m.files["project/v2/ui.jsx"].divergentReason = "改接後端 API，刻意不追隨設計";
+      m.files["project/v2/ui.jsx"].divergentSince = "2026-11-10";
+      writeFileSync(manifestPath, JSON.stringify(m));
+    };
+
+    it("被標記 divergent 的設計檔變更不列為待同步，而標示為刻意分歧", () => {
+      markDivergent();
+      write("project/v2/ui.jsx", "ui 已修改");
+      // 沒有其他待同步變更，exit 0
+      assert.equal(exec("check", pulled), 0);
+      assert.match(output(), /沒有設計變更/);
+      assert.match(output(), /刻意分歧（不同步）（1）/);
+      assert.match(output(), /project\/v2\/ui\.jsx/);
+      assert.doesNotMatch(output(), /已變更（1）/);
+    });
+
+    it("其餘未標記的對應照常列為待同步", () => {
+      markDivergent();
+      write("project/v2/ui.jsx", "ui 已修改");   // divergent，不計
+      write("project/data.js", "data 已修改");    // 一般，應列為已變更
+      assert.equal(exec("check", pulled), 1);
+      assert.match(output(), /已變更（1）/);
+      assert.match(output(), /project\/data\.js/);
+      assert.match(output(), /刻意分歧（不同步）（1）/);
+    });
+
+    it("update 不以設計檔覆寫 divergent 對應，保留原雜湊與標記", () => {
+      markDivergent();
+      write("project/v2/ui.jsx", "ui 已修改");
+      const originalSha = hash("ui");
+      assert.equal(exec("update", pulled, "--version", "v2", "--date", "2026-12-01"), 0);
+      const manifest = readManifest();
+      // 原雜湊保留（未被新內容雜湊覆寫），標記仍在
+      assert.equal(manifest.files["project/v2/ui.jsx"].sha256, originalSha);
+      assert.equal(manifest.files["project/v2/ui.jsx"].divergent, true);
+      assert.equal(manifest.files["project/v2/ui.jsx"].divergentReason, "改接後端 API，刻意不追隨設計");
+    });
+  });
 });

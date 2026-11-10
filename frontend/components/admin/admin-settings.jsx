@@ -1,30 +1,40 @@
 // frontend/components/admin/admin-settings.jsx
-// 網站設定：基本資料、部落格/作品分類管理、社群連結與示範資料重設
+// 網站設定：基本資料、部落格/作品分類、社群連結；改接後端 API（本機表單狀態 + 儲存設定按鈕 PUT）
 
 "use client";
 
 import React from "react";
 import { useLake } from "@/store/lake-context";
-import { Lake } from "@/store/lake";
 
 export default function AdminSettings() {
-  const { db, update } = useLake();
-  const s = db.settings;
-  const set = (k, v) => update(d => { d.settings[k] = v; return d; });
-  const setSocial = (i, k, v) => update(d => { d.settings.social[i][k] = v; return d; });
-  const addSocial = () => update(d => { d.settings.social.push({ label: "新連結", url: "" }); return d; });
-  const delSocial = i => update(d => { d.settings.social.splice(i, 1); return d; });
+  const { db, updateSettings } = useLake();
+  // 本機表單狀態，編輯即時反映；按「儲存設定」才 PUT 到後端
+  const [form, setForm] = React.useState(db.settings || {});
+  // settings 由後端載入（或後台重載）後同步一次
+  React.useEffect(() => { if (db.settings) setForm(db.settings); }, [db.settings]);
+
+  const s = form;
   const [saved, setSaved] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [err, setErr] = React.useState("");
   const [newCatB, setNewCatB] = React.useState("");
   const [newCatW, setNewCatW] = React.useState("");
-  const flash = () => { setSaved(true); setTimeout(() => setSaved(false), 2000); };
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const setSocial = (i, k, v) => setForm(f => {
+    const social = (f.social || []).map((x, idx) => idx === i ? { ...x, [k]: v } : x);
+    return { ...f, social };
+  });
+  const addSocial = () => setForm(f => ({ ...f, social: [...(f.social || []), { label: "新連結", url: "" }] }));
+  const delSocial = i => setForm(f => ({ ...f, social: (f.social || []).filter((_, idx) => idx !== i) }));
 
   const addCat = (key, val, clear) => {
     const v = val.trim();
     if (!v) return;
-    update(d => {
-      if (!d.settings[key].includes(v)) d.settings[key].push(v);
-      return d;
+    setForm(f => {
+      const arr = f[key] || [];
+      if (arr.includes(v)) return f;
+      return { ...f, [key]: [...arr, v] };
     });
     clear("");
   };
@@ -33,18 +43,32 @@ export default function AdminSettings() {
       ? db.articles.some(a => a.cat === c)
       : db.articles.some(a => a.showcase && a.workCat === c);
     if (inUse) { alert("尚有文章使用「" + c + "」分類，請先調整那些文章。"); return; }
-    update(d => { d.settings[key] = d.settings[key].filter(x => x !== c); return d; });
+    setForm(f => ({ ...f, [key]: (f[key] || []).filter(x => x !== c) }));
+  };
+
+  const save = async () => {
+    if (saving) return;
+    setErr(""); setSaving(true);
+    try {
+      await updateSettings(form);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      setErr(e.message || "儲存失敗");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const inp = (k, extra) => (
-    <input className="a-inp" value={s[k]} onChange={e => set(k, e.target.value)} {...(extra || {})} />
+    <input className="a-inp" value={s[k] || ""} onChange={e => set(k, e.target.value)} {...(extra || {})} />
   );
 
   const CatEditor = (key, label, hint, newVal, setNewVal) => (
     <div>
       <div className="ntc text-[12px] font-bold mb-1.5">{label}</div>
       <div className="flex flex-wrap gap-1.5 mb-2">
-        {s[key].map(c => (
+        {(s[key] || []).map(c => (
           <span key={c} className="inline-flex items-center gap-1.5 border a-line px-2.5 py-1 ntc text-[12px]" style={{ borderRadius: "var(--a-rad)" }}>
             {c}
             <button className="a-dim mono text-[11px] cursor-pointer hover:opacity-70" title="刪除分類" onClick={() => delCat(key, c)}>✕</button>
@@ -77,7 +101,7 @@ export default function AdminSettings() {
         <div>
           <label className="block ntc text-[12px] font-bold mb-1">公告列</label>
           {inp("announcement")}
-          <div className="a-dim text-[10px] mono mt-1">留空即隱藏前台公告列。改動立即反映在前台。</div>
+          <div className="a-dim text-[10px] mono mt-1">留空即隱藏前台公告列。儲存後反映在前台。</div>
         </div>
       </div>
 
@@ -92,25 +116,27 @@ export default function AdminSettings() {
           <div className="ntc font-black text-[14px] flex-1">社群連結</div>
           <button className="a-btn ntc text-[11px]" onClick={addSocial}>＋新增連結</button>
         </div>
-        {s.social.map((so, i) => (
+        {(s.social || []).map((so, i) => (
           <div key={i} className="grid grid-cols-[140px_1fr_auto] gap-2">
             <input className="a-inp" value={so.label} onChange={e => setSocial(i, "label", e.target.value)} />
             <input className="a-inp mono text-[12px]" value={so.url} placeholder="https://…" onChange={e => setSocial(i, "url", e.target.value)} />
             <button className="a-btn ntc text-[11px] a-dim" title="刪除" onClick={() => delSocial(i)}>✕</button>
           </div>
         ))}
-        {s.social.length === 0 && <div className="a-dim mono text-[11px]">尚無連結 — 頁尾將不顯示社群區。</div>}
+        {(s.social || []).length === 0 && <div className="a-dim mono text-[11px]">尚無連結 — 頁尾將不顯示社群區。</div>}
       </div>
 
       <div className="a-panel p-4 a-dim ntc text-[12px]">
-        原型注記 — 目前所有內容（文章、作品、留言、設定、贊助）都存在瀏覽器儲存中模擬資料庫；正式版換成後端 API 後，這些後台介面維持不變，直接對接資料庫即可。
+        注記 — 所有內容（文章、作品、留言、設定、贊助）現已改由後端 API 提供與儲存；在此修改後按「儲存設定」會經 API 寫入後端，換裝置或重整後仍一致。
       </div>
 
       <div className="flex items-center gap-3">
-        <button className="a-btn a-btn-acc ntc" onClick={flash}>儲存設定</button>
-        {saved && <span className="mono text-[11px] a-acc">✓ 已儲存（原型即時生效）</span>}
-        <div className="flex-1"></div>
-        <button className="a-btn ntc text-[11px]" onClick={() => { if (confirm("重設所有內容為預設值？")) { Lake.reset(); location.reload(); } }}>重設示範資料</button>
+        <button className="a-btn a-btn-acc ntc" onClick={save} disabled={saving}
+          style={saving ? { opacity: .6, cursor: "not-allowed" } : {}}>
+          {saving ? "儲存中…" : "儲存設定"}
+        </button>
+        {saved && <span className="mono text-[11px] a-acc">✓ 已儲存</span>}
+        {err && <span className="mono text-[11px]" style={{ color: "#d14343" }}>✕ {err}</span>}
       </div>
     </div>
   );

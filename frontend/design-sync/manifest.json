@@ -90,7 +90,10 @@
       "sha256": "71b069086e063aaa72f39f6d644fbfefc3db83ae29e273e64fd2f8c3bfa763fd",
       "targets": [
         "store/lake.js"
-      ]
+      ],
+      "divergent": true,
+      "divergentReason": "SDP-103：store/lake.js 已改接後端 API（業務資料不再存 localStorage），刻意與設計專案 project/v2/store.js 分歧；差異報告不列為待同步，design-pull 不覆寫。",
+      "divergentSince": "2026-11-10"
     },
     "project/v2/ui.jsx": {
       "sha256": "63a67ce5b84933843344f08d4ed99c5f3a1a848dcb3a20241d9ffe05f414f950",

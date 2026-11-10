@@ -41,6 +41,9 @@ export function hashPulled(pulledDir, include) {
   return hashes;
 }
 
+// 被標記 divergent（刻意分歧）的對應：差異報告不列為待同步，同步也不覆寫
+const isDivergent = entry => !!(entry && entry.divergent);
+
 // 只依內容雜湊判定差異，artifact 版本號不參與判斷
 export function diff(manifest, hashes) {
   const baseline = manifest.files;
@@ -48,36 +51,56 @@ export function diff(manifest, hashes) {
   return {
     added: paths.filter(p => !baseline[p]).map(path => ({ path, targets: [] })),
     changed: paths
-      .filter(p => baseline[p] && baseline[p].sha256 !== hashes[p])
+      // 刻意分歧的對應即使雜湊不同也不列為待同步變更
+      .filter(p => baseline[p] && !isDivergent(baseline[p]) && baseline[p].sha256 !== hashes[p])
       .map(path => ({ path, targets: baseline[path].targets })),
     removed: Object.keys(baseline)
-      .filter(p => !hashes[p])
+      .filter(p => !hashes[p] && !isDivergent(baseline[p]))
       .sort()
       .map(path => ({ path, targets: baseline[path].targets })),
+    // 單獨列出被雜湊比對判定「若非分歧本會變更」的刻意分歧對應，供報告標示
+    divergent: paths
+      .filter(p => baseline[p] && isDivergent(baseline[p]) && baseline[p].sha256 !== hashes[p])
+      .map(path => ({ path, targets: baseline[path].targets, reason: baseline[path].divergentReason || "" })),
   };
 }
 
 // 回傳新的基準，既有檔案保留 targets，新檔案的 targets 留空待補
+// 刻意分歧的對應保留原 sha256 與分歧標記、不隨設計檔更新（代表前端刻意不追隨）
 export function buildManifest(manifest, hashes, version, date) {
   const files = {};
   for (const path of Object.keys(hashes).sort()) {
-    files[path] = { sha256: hashes[path], targets: manifest.files[path]?.targets ?? [] };
+    const prev = manifest.files[path];
+    if (isDivergent(prev)) {
+      files[path] = { ...prev }; // 原樣保留，不以新雜湊覆寫
+    } else {
+      files[path] = { sha256: hashes[path], targets: prev?.targets ?? [] };
+    }
+  }
+  // 設計檔已不在拉取範圍，但仍標記為刻意分歧的對應也要保留（避免被當成「移除」丟掉）
+  for (const path of Object.keys(manifest.files)) {
+    if (!files[path] && isDivergent(manifest.files[path])) files[path] = { ...manifest.files[path] };
   }
   return { ...manifest, syncedVersion: version, syncedAt: date, files };
 }
 
 export function formatReport(result) {
-  const { added, changed, removed } = result;
-  if (added.length + changed.length + removed.length === 0) return "沒有設計變更。";
+  const { added, changed, removed, divergent = [] } = result;
   const lines = [];
   const section = (title, items, describe) => {
     if (items.length === 0) return;
     lines.push(`${title}（${items.length}）`);
     for (const item of items) lines.push(`  ${item.path}`, `    ${describe(item)}`);
   };
-  section("已變更", changed, item => `→ ${item.targets.join(", ")}`);
-  section("新增", added, () => "→ 尚無前端對應");
-  section("移除", removed, item => `原對應 → ${item.targets.join(", ")}`);
+  if (added.length + changed.length + removed.length === 0) {
+    lines.push("沒有設計變更。");
+  } else {
+    section("已變更", changed, item => `→ ${item.targets.join(", ")}`);
+    section("新增", added, () => "→ 尚無前端對應");
+    section("移除", removed, item => `原對應 → ${item.targets.join(", ")}`);
+  }
+  // 刻意分歧的對應單獨標示，不計入待同步
+  section("刻意分歧（不同步）", divergent, item => `設計檔已變更但不追隨 → ${item.targets.join(", ")}`);
   return lines.join("\n");
 }
 

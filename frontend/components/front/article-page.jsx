@@ -6,11 +6,10 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { useLake } from "@/store/lake-context";
-import { Lake } from "@/store/lake";
 import { SecHead, Markdown } from "@/components/ui";
 
 export default function ArticlePage({ id }) {
-  const { db, update, theme } = useLake();
+  const { db, loading, theme } = useLake();
   const router = useRouter();
   const a = db.articles.find(x => x.id === id);
   const night = theme === "night";
@@ -19,20 +18,11 @@ export default function ArticlePage({ id }) {
     setFs(Number(localStorage.getItem("lake_read_fs")) || 14.5);
   }, []);
   const setFsP = v => { setFs(v); localStorage.setItem("lake_read_fs", v); };
-  // count a view once per session
-  React.useEffect(() => {
-    if (!a) return;
-    const k = "lake_viewed_" + a.id;
-    if (!sessionStorage.getItem(k)) {
-      sessionStorage.setItem(k, "1");
-      update(d => {
-        const t = d.articles.find(x => x.id === a.id);
-        if (t) t.views += 1;
-        return d;
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  // 瀏覽數改由後端 pageview 統計（FrontShell 導覽時回報 /stats/pageview），不再在前端累加
+  // 文章尚未載入完成時先顯示載入指示，避免誤判為 404
+  if (loading && !a) {
+    return <div className="py-16 text-center mono text-[12px] v-dim">載入中…</div>;
+  }
   if (!a || a.status !== "published") {
     return (
       <div className="py-16 text-center">
@@ -100,25 +90,25 @@ export default function ArticlePage({ id }) {
 
 // ── per-article comments（預設摺疊，保持閱讀版面乾淨）──
 function ArticleComments({ article }) {
-  const { db, update, theme } = useLake();
+  const { db, postComment, theme } = useLake();
   const night = theme === "night";
   const list = db.comments.filter(c => c.articleId === article.id && c.status === "visible");
   const [open, setOpen] = React.useState(false);
   const [name, setName] = React.useState("");
   const [text, setText] = React.useState("");
   const [sent, setSent] = React.useState(false);
+  const [err, setErr] = React.useState("");
 
-  const submit = () => {
+  const submit = async () => {
     if (!text.trim()) return;
-    update(d => {
-      d.comments.unshift({
-        id: Lake.uid(), name: name.trim() || "匿名訪客", date: Lake.today(),
-        text: text.trim(), status: "pending", reply: "", articleId: article.id,
-      });
-      return d;
-    });
-    setName(""); setText(""); setSent(true);
-    setTimeout(() => setSent(false), 3500);
+    setErr("");
+    try {
+      await postComment({ name: name.trim() || "匿名訪客", text: text.trim(), articleId: article.id });
+      setName(""); setText(""); setSent(true);
+      setTimeout(() => setSent(false), 3500);
+    } catch (e) {
+      setErr(e.message || "送出失敗");
+    }
   };
 
   return (
@@ -161,7 +151,7 @@ function ArticleComments({ article }) {
         </div>
         <textarea className="inp ntc" rows={2} placeholder={night ? "> 留言內容…" : "留言內容…"} value={text} onChange={e => setText(e.target.value)} maxLength={300}></textarea>
         <div className="flex items-center justify-between mt-2.5">
-          <div className="mono text-[10px] v-dim">{sent ? "✓ 已送出，待審核後顯示" : text.length + " / 300"}</div>
+          <div className="mono text-[10px] v-dim">{err ? "✕ " + err : sent ? "✓ 已送出，待審核後顯示" : text.length + " / 300"}</div>
           <button className="btn btn-acc ntc" onClick={submit}>送出留言</button>
         </div>
       </div>

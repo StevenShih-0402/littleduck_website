@@ -1,5 +1,6 @@
 // frontend/components/admin/admin-editor.jsx
 // 文章編輯器：中繼資料表單、橫幅設定、作品展示連動、Markdown 編輯與即時預覽（含全螢幕）
+// 資料改接後端：以本機 draft 狀態維持輸入即時反應，變更以 debounce 經 updateArticle 寫回。
 
 "use client";
 
@@ -8,9 +9,24 @@ import { useLake } from "@/store/lake-context";
 import { Markdown } from "@/components/ui";
 import StatusPill from "./status-pill";
 
+const SAVE_DELAY = 700; // ms：輸入停止後才寫回後端，避免每次按鍵都打 API
+
 export default function AdminEditor({ id, back }) {
-  const { db, update } = useLake();
-  const a = db.articles.find(x => x.id === id);
+  const { db, updateArticle } = useLake();
+  const stored = db.articles.find(x => x.id === id);
+
+  // 本機 draft：輸入即時反映在表單與預覽，不等 API 往返
+  const [draft, setDraft] = React.useState(stored || null);
+  const [saving, setSaving] = React.useState(false);
+  const timer = React.useRef(null);
+  const pending = React.useRef(null);
+
+  // 切換文章時同步 draft（以 id 為界，避免把別篇的輸入帶過去）
+  React.useEffect(() => {
+    setDraft(db.articles.find(x => x.id === id) || null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
   const [showPrev, setShowPrev] = React.useState(true);
   const [full, setFull] = React.useState(false);
   const [edFs, setEdFs] = React.useState(12.5);
@@ -25,22 +41,59 @@ export default function AdminEditor({ id, back }) {
     document.body.style.overflow = "hidden";
     return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = ""; };
   }, [full]);
-  if (!a) return <div className="a-dim mono text-[12px]">找不到文章。<button className="a-btn ml-2" onClick={back}>返回</button></div>;
-  const set = (k, v) => update(d => { const t = d.articles.find(x => x.id === id); if (t) t[k] = v; return d; });
-  const cats = Array.from(new Set([...(db.settings.catsBlog || []), a.cat].filter(Boolean)));
-  const wCats = db.settings.catsWorks || [];
+
+  // 卸載時把尚未寫回的變更 flush 掉
+  React.useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+    if (pending.current) updateArticle(id, pending.current).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (!draft) return <div className="a-dim mono text-[12px]">找不到文章。<button className="a-btn ml-2" onClick={back}>返回</button></div>;
+  const a = draft;
+
+  // debounce 寫回：累積的 patch 合併送出
+  const scheduleSave = patch => {
+    pending.current = { ...(pending.current || {}), ...patch };
+    setSaving(true);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(async () => {
+      const toSend = pending.current;
+      pending.current = null;
+      try { await updateArticle(id, toSend); } catch {}
+      setSaving(false);
+    }, SAVE_DELAY);
+  };
+
+  // 更新本機 draft（即時）＋ 排程寫回（debounce）
+  const set = (k, v) => { setDraft(d => ({ ...d, [k]: v })); scheduleSave({ [k]: v }); };
+
+  // 狀態切換：立即寫回（非輸入連打）
+  const toggleStatus = () => {
+    const next = a.status === "published" ? "draft" : "published";
+    setDraft(d => ({ ...d, status: next }));
+    if (timer.current) clearTimeout(timer.current);
+    const patch = { ...(pending.current || {}), status: next };
+    pending.current = null;
+    updateArticle(id, patch).catch(() => {});
+  };
+
+  const cats = Array.from(new Set([...((db.settings && db.settings.catsBlog) || []), a.cat].filter(Boolean)));
+  const wCats = (db.settings && db.settings.catsWorks) || [];
   const gallery = a.gallery || [];
-  const setGal = (i, v) => update(d => { const t = d.articles.find(x => x.id === id); if (t) { t.gallery = t.gallery || []; t.gallery[i] = v; } return d; });
-  const addGal = () => update(d => { const t = d.articles.find(x => x.id === id); if (t) { t.gallery = t.gallery || []; if (t.gallery.length < 10) t.gallery.push(""); } return d; });
-  const delGal = i => update(d => { const t = d.articles.find(x => x.id === id); if (t && t.gallery) t.gallery.splice(i, 1); return d; });
-  const moveGal = (i, dir) => update(d => {
-    const t = d.articles.find(x => x.id === id);
-    if (!t || !t.gallery) return d;
+
+  // gallery 變更：更新本機 draft 後排程寫回整個 gallery 陣列
+  const commitGallery = next => { setDraft(d => ({ ...d, gallery: next })); scheduleSave({ gallery: next }); };
+  const setGal = (i, v) => { const g = [...gallery]; g[i] = v; commitGallery(g); };
+  const addGal = () => { if (gallery.length < 10) commitGallery([...gallery, ""]); };
+  const delGal = i => { const g = [...gallery]; g.splice(i, 1); commitGallery(g); };
+  const moveGal = (i, dir) => {
     const j = i + dir;
-    if (j < 0 || j >= t.gallery.length) return d;
-    [t.gallery[i], t.gallery[j]] = [t.gallery[j], t.gallery[i]];
-    return d;
-  });
+    if (j < 0 || j >= gallery.length) return;
+    const g = [...gallery];
+    [g[i], g[j]] = [g[j], g[i]];
+    commitGallery(g);
+  };
 
   return (
     <div>
@@ -48,8 +101,7 @@ export default function AdminEditor({ id, back }) {
         <button className="a-btn ntc text-[11px]" onClick={back}>← 文章列表</button>
         <div className="ntc font-black text-[15px] flex-1 truncate">編輯：{a.title}</div>
         <StatusPill st={a.status} />
-        <button className="a-btn a-btn-acc ntc text-[11px]"
-          onClick={() => set("status", a.status === "published" ? "draft" : "published")}>
+        <button className="a-btn a-btn-acc ntc text-[11px]" onClick={toggleStatus}>
           {a.status === "published" ? "轉為草稿" : "發布上線"}
         </button>
       </div>
@@ -178,7 +230,7 @@ export default function AdminEditor({ id, back }) {
           )}
         </div>
       </div>
-      <div className="a-dim mono text-[10px] mt-3">✓ 即時儲存 — 前台立刻反映（原型使用瀏覽器儲存）。</div>
+      <div className="a-dim mono text-[10px] mt-3">{saving ? "儲存中…" : "✓ 已同步 — 變更經後端 API 儲存，前台即時反映。"}</div>
     </div>
   );
 }
