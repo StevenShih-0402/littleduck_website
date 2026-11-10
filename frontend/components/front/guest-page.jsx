@@ -9,23 +9,24 @@ import { Lake } from "@/store/lake";
 import { SecHead } from "@/components/ui";
 
 export default function GuestPage() {
-  const { db, update, theme } = useLake();
+  const { db, postComment, theme } = useLake();
   const [name, setName] = React.useState("");
   const [text, setText] = React.useState("");
   const [sent, setSent] = React.useState(false);
+  const [err, setErr] = React.useState("");
+  // 留言板留言：articleId 為空字串/null 皆視為留言板
   const visible = db.comments.filter(c => c.status === "visible" && !c.articleId);
 
-  const submit = () => {
+  const submit = async () => {
     if (!text.trim()) return;
-    update(d => {
-      d.comments.unshift({
-        id: Lake.uid(), name: name.trim() || "匿名訪客", date: Lake.today(),
-        text: text.trim(), status: "pending", reply: "", articleId: null,
-      });
-      return d;
-    });
-    setName(""); setText(""); setSent(true);
-    setTimeout(() => setSent(false), 3500);
+    setErr("");
+    try {
+      await postComment({ name: name.trim() || "匿名訪客", text: text.trim(), articleId: "" });
+      setName(""); setText(""); setSent(true);
+      setTimeout(() => setSent(false), 3500);
+    } catch (e) {
+      setErr(e.message || "送出失敗，請稍後再試。");
+    }
   };
 
   return (
@@ -45,6 +46,7 @@ export default function GuestPage() {
           <button className="btn btn-acc ntc" onClick={submit}>送出留言</button>
         </div>
         {sent && <div className="mono text-[11px] v-acc mt-2">✓ 已送出，待屋主審核後顯示。</div>}
+        {err && <div className="mono text-[11px] mt-2" style={{ color: "#d14343" }}>✕ {err}</div>}
       </div>
       {/* messages */}
       <div className="space-y-4">

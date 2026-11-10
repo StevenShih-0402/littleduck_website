@@ -5,7 +5,6 @@
 
 import React from "react";
 import { useLake } from "@/store/lake-context";
-import { Lake } from "@/store/lake";
 
 export function HoneyLemonIcon({ size }) {
   return (
@@ -20,8 +19,8 @@ export function HoneyLemonIcon({ size }) {
 }
 
 export default function SponsorFab() {
-  const { db, update, theme } = useLake();
-  const sp = db.settings.sponsor || { title: "請小鴨喝杯蜂蜜檸檬", subtitle: "", tiers: [] };
+  const { db, theme } = useLake();
+  const sp = (db.settings && db.settings.sponsor) || { title: "請小鴨喝杯蜂蜜檸檬", subtitle: "", tiers: [] };
   const tiers = sp.tiers || [];
   const [open, setOpen] = React.useState(false);
   const [amount, setAmount] = React.useState(tiers[0] ? tiers[0].amt : 50);
@@ -32,11 +31,7 @@ export default function SponsorFab() {
 
   const confirm = () => {
     if (finalAmt <= 0) return;
-    update(d => {
-      d.donations = d.donations || [];
-      d.donations.unshift({ id: Lake.uid(), date: Lake.today(), amt: finalAmt, name: "匿名訪客", note: msg.trim() });
-      return d;
-    });
+    // 贊助寫入與實際金流（ECPay）屬 SDP-104，尚未串接；此處僅顯示感謝畫面，不寫入任何資料。
     setThanks(true);
     setTimeout(() => { setThanks(false); setOpen(false); setCustom(""); setMsg(""); setAmount(tiers[0] ? tiers[0].amt : 50); }, 2200);
   };

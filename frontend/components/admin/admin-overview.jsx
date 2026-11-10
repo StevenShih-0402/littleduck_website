@@ -8,9 +8,10 @@ import { useLake } from "@/store/lake-context";
 
 export default function AdminOverview({ goTab }) {
   const { db } = useLake();
-  const days = db.stats.daily;
+  const days = db.stats.daily || [];
   const last14 = days.slice(-14);
-  const maxV = Math.max(...last14.map(d => d.views));
+  // 真實資料可能全為零（尚無瀏覽紀錄）；避免除以零造成 NaN
+  const maxV = Math.max(1, ...last14.map(d => d.views));
   const totV = days.reduce((s, d) => s + d.views, 0);
   const totU = days.reduce((s, d) => s + d.visitors, 0);
   const pub = db.articles.filter(a => a.status === "published");
@@ -39,7 +40,7 @@ export default function AdminOverview({ goTab }) {
         <div className="a-panel p-5 col-span-12 lg:col-span-7">
           <div className="flex items-baseline justify-between mb-4">
             <div className="ntc font-black text-[14px]">流量趨勢</div>
-            <div className="a-dim mono text-[10px]">最近 14 天 · 假資料示意</div>
+            <div className="a-dim mono text-[10px]">最近 14 天</div>
           </div>
           <div className="flex items-end gap-1.5 h-32">
             {last14.map((d, i) => (
@@ -47,9 +48,9 @@ export default function AdminOverview({ goTab }) {
                 <div className="w-full relative flex items-end" style={{ height: "104px" }}>
                   <div className="w-full transition-all"
                     style={{ height: (d.views / maxV * 100) + "%", background: "var(--a-acc)", opacity: .35 + .65 * (d.views / maxV), borderRadius: "3px 3px 0 0" }}
-                    title={d.d + " · " + d.views + " views"}></div>
+                    title={d.day + " · " + d.views + " views"}></div>
                 </div>
-                <div className="a-dim mono text-[8px]">{d.d}</div>
+                <div className="a-dim mono text-[8px]">{d.day}</div>
               </div>
             ))}
           </div>

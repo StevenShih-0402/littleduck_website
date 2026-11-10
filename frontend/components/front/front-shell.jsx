@@ -25,9 +25,38 @@ function activeKey(pathname) {
 }
 
 export default function FrontShell({ children }) {
-  const { db, theme, setTheme } = useLake();
+  const { db, theme, setTheme, loading, error, reportPageview } = useLake();
   const [drawer, setDrawer] = React.useState(false);
-  const active = activeKey(usePathname() || "/");
+  const pathname = usePathname() || "/";
+  const active = activeKey(pathname);
+
+  // 前台導覽時回報瀏覽（fire-and-forget，不影響渲染）
+  React.useEffect(() => {
+    reportPageview(pathname);
+  }, [pathname, reportPageview]);
+
+  const settings = db.settings;
+
+  // 載入中 / 錯誤的全頁狀態（避免 null settings 造成崩潰）
+  if (loading && !settings) {
+    return (
+      <div className="min-h-screen v-bg theme-fade flex items-center justify-center">
+        <div className="mono text-[12px] v-dim">載入中…</div>
+      </div>
+    );
+  }
+  if (error && !settings) {
+    return (
+      <div className="min-h-screen v-bg theme-fade flex items-center justify-center px-4">
+        <div className="text-center">
+          <div className="mono text-[12px] v-dim mb-2">無法載入網站內容</div>
+          <div className="ntc text-[13px] v-dim">{error}</div>
+        </div>
+      </div>
+    );
+  }
+  if (!settings) return null;
+
   return (
     <div className="min-h-screen v-bg theme-fade">
       {/* announcement */}
@@ -85,7 +114,7 @@ export default function FrontShell({ children }) {
         <div className="max-w-[1100px] mx-auto px-4 sm:px-6 py-5 flex flex-col sm:flex-row gap-2 justify-between mono text-[10.5px] uppercase tracking-[.15em] v-dim">
           <div>{SITE.copyright}</div>
           <div className="flex gap-4">
-            {db.settings.social.map(s => (
+            {(db.settings.social || []).map(s => (
               <a key={s.label} href={s.url} onClick={e => e.preventDefault()} className="hover-rule cursor-pointer">{s.label}</a>
             ))}
           </div>

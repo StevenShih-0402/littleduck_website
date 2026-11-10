@@ -1,5 +1,5 @@
 // frontend/components/admin/admin-comments.jsx
-// 留言管理：待審核/已顯示/已隱藏分組、通過/隱藏/刪除與屋主回覆
+// 留言管理：待審核/已顯示/已隱藏分組、通過/隱藏與屋主回覆（改接後端 API）
 
 "use client";
 
@@ -7,7 +7,7 @@ import React from "react";
 import { useLake } from "@/store/lake-context";
 
 export default function AdminComments() {
-  const { db, update } = useLake();
+  const { db, setCommentStatus, replyComment } = useLake();
   const [replying, setReplying] = React.useState(null);
   const [replyText, setReplyText] = React.useState("");
   const artName = id => {
@@ -15,17 +15,10 @@ export default function AdminComments() {
     const a = db.articles.find(x => x.id === id);
     return a ? a.title : "(已刪文章)";
   };
-  const setStatus = (id, st) => update(d => {
-    const c = d.comments.find(x => x.id === id);
-    if (c) c.status = st;
-    return d;
-  });
-  const del = id => {
-    if (!confirm("刪除這則留言？")) return;
-    update(d => { d.comments = d.comments.filter(x => x.id !== id); return d; });
-  };
+  // 後端無硬刪除留言 API（本輪範圍外）；原「刪除」改為設為 hidden（隱藏）。
+  const setStatus = (id, st) => { setCommentStatus(id, st); };
   const saveReply = id => {
-    update(d => { const c = d.comments.find(x => x.id === id); if (c) c.reply = replyText.trim(); return d; });
+    replyComment(id, replyText.trim());
     setReplying(null); setReplyText("");
   };
   const groups = [
@@ -63,7 +56,6 @@ export default function AdminComments() {
                       <button className="a-btn ntc text-[11px]" onClick={() => { setReplying(c.id); setReplyText(c.reply || ""); }}>回覆</button>
                     )}
                     {st !== "hidden" && <button className="a-btn ntc text-[11px]" onClick={() => setStatus(c.id, "hidden")}>隱藏</button>}
-                    <button className="a-btn ntc text-[11px] a-dim" onClick={() => del(c.id)}>刪除</button>
                   </div>
                   {replying === c.id && (
                     <div className="mt-3 flex gap-2">
