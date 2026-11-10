@@ -5,7 +5,7 @@
 
 Remote Control 讓手機的 Claude app（或 claude.ai/code）連到本機的 Claude Code。Claude 與所有指令都在這台電腦上執行，手機只負責顯示畫面和送出訊息。
 
-本 repo 用 `.claude/scripts/remote-control.sh` 把 server 掛在背景的 tmux 裡。關掉終端機 server 也會繼續執行，手機隨時可以看進度、開新 session 派任務。code_city 也有同一支腳本。
+本 repo 用 `.claude/scripts/remote-control.sh` 把 server 掛在背景的 tmux 裡。關掉終端機 server 也會繼續執行，手機隨時可以看進度、開新 session 派任務。同一支腳本也放在 code_city、littleduck-skills、littleduck_website、luke、mygo_v2_anon。
 
 ## 前置條件
 

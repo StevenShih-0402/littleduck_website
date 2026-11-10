@@ -66,6 +66,7 @@ agent-team 的通用文件預設「前端 repo、後端 repo 各一個、各自�
 | 階段 | 檢查 | 誰做 |
 |------|------|------|
 | PR 前 | 確保正常運行：測試、lint、typecheck、執行驗證 | Teshima「檢查」 |
+| PR 前 | 驗證測試有效性：對關鍵模組跑變異測試 | Teshima「檢查」 |
 | PR 前 | 檢查代碼品質：對照規格審需求與測試覆蓋 | Akafuku 審查模式 |
 | PR 中 | CI：等 Drone 的 `continuous-integration/drone/pr` check 通過（見 `docs/cicd.md`） | 主對話 |
 | PR 中 | AI 審核：內建 `/code-review` | 主對話，Akafuku 評定 |
@@ -132,6 +133,23 @@ Teshima「檢查」依本段把產品跑起來觀察。指令在 worktree 根目
 - **停止**：`API_PORT=18080 docker compose -f backend/docker-compose.yml -p "ld-check-$(basename "$PWD")" down -v` 與 `kill "$(cat /tmp/ld-next.pid)"`（直接執行 `node_modules/.bin/next` 而非 `npx`，pid 檔記到的才是服務本身；也不要用 `pkill -f`，會連下指令的 shell 一起比對到）
 
 後端用 18080 埠，避開本機常被佔用的 8080；同一時間只能檢查一個 worktree。本次變更特有的觀察點由 Hikaru 寫在 `design.md` 的「## 執行驗證觀察點」，Teshima 兩者都跑。
+
+### 變異測試（各 repo 的 `CLAUDE.md`）
+
+Teshima「檢查」會對關鍵模組跑變異測試，確認 Agent 產出的測試真的能在程式出錯時失敗，而不只是存在。定位：
+
+- **只在 Teshima「檢查」段跑**；開發 Agent（Yasumi／Fujimori）與審查 Agent（Akafuku）都不跑。
+- **範圍只限 Hikaru 在該端 `design.md`「## 變異測試目標」逐案標示的關鍵模組**（例：權限檢查、狀態機），不做全專案變異測試。標示為「無」時 Teshima 記為不適用、不跑。
+- **變異測試指令與通過閾值由各 repo 自己的 `CLAUDE.md` 提供**；沒設定就略過、不擋流程。格式：
+
+```markdown
+## 變異測試
+
+- **指令**：`<變異測試指令，接受目標模組/路徑參數>`
+- **通過閾值**：`<變異分數下限，例：80%>`
+```
+
+- 有目標且有指令、但某目標低於閾值時，Teshima 退回該端開發 Agent，重現步驟寫該變異測試指令，退回次數與其他檢查合併計算。
 
 ### review-diff.patch 不進版控
 

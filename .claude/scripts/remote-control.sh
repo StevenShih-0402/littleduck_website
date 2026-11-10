@@ -8,7 +8,7 @@
 #   stop         ：送 Ctrl-C 讓 server 正常結束，逾時（RC_STOP_TIMEOUT 秒，預設 5）則強制結束 session
 #   attach       ：接回 server 畫面（看 QR code、回答首次啟動的確認提示），以 Ctrl-b d 離開
 #
-# 本檔在 code_city 與 littleduck_website 內容相同，修改時兩邊一起改。
+# 本檔在 code_city、littleduck-skills、littleduck_website、luke、mygo_v2_anon 內容相同，修改時一起改。
 set -euo pipefail
 
 readonly SPAWN_MODE="same-dir"
