@@ -1,5 +1,12 @@
 basePath: /
 definitions:
+  auth.Token:
+    properties:
+      expires_at:
+        type: string
+      token:
+        type: string
+    type: object
   controller.healthStatus:
     properties:
       database:
@@ -7,20 +14,203 @@ definitions:
       status:
         type: string
     type: object
+  controller.loginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  controller.pageviewRequest:
+    properties:
+      path:
+        type: string
+    type: object
+  controller.replyRequest:
+    properties:
+      reply:
+        type: string
+    type: object
+  controller.statusRequest:
+    properties:
+      status:
+        type: string
+    required:
+    - status
+    type: object
   model.Article:
     properties:
-      content:
+      award:
+        description: 得獎資訊或技術棧
+        type: string
+      banner:
+        description: 橫幅圖
+        type: string
+      bannerFade:
+        description: 橫幅是否淡出
+        type: boolean
+      blurb:
+        description: 摘要
+        type: string
+      body:
+        description: 內文（Markdown）
+        type: string
+      cat:
+        description: 部落格分類（小說／隨筆／技術）
         type: string
       created_at:
         type: string
+      date:
+        description: 顯示用日期字串
+        type: string
+      gallery:
+        description: 展示用封面圖
+        items:
+          type: string
+        type: array
       id:
-        type: integer
-      tag:
+        description: 文章 id（如 a0、p1）
+        type: string
+      showcase:
+        description: 是否顯示於作品展示
+        type: boolean
+      status:
+        description: draft / published
         type: string
       title:
+        description: 標題
         type: string
       updated_at:
         type: string
+      views:
+        description: 瀏覽數
+        type: integer
+      workCat:
+        description: 作品展示分類
+        type: string
+      "y":
+        description: 年份
+        type: integer
+    type: object
+  model.Comment:
+    properties:
+      articleId:
+        description: 所屬文章 id；空字串＝留言板
+        type: string
+      created_at:
+        type: string
+      date:
+        description: 顯示用日期字串
+        type: string
+      id:
+        description: 留言 id（如 c1）
+        type: string
+      name:
+        description: 留言者名稱
+        type: string
+      reply:
+        description: 管理員回覆
+        type: string
+      status:
+        description: pending / visible / hidden
+        type: string
+      text:
+        description: 留言內容
+        type: string
+      updated_at:
+        type: string
+    type: object
+  model.Donation:
+    properties:
+      amt:
+        description: 金額
+        type: integer
+      created_at:
+        type: string
+      date:
+        description: 顯示用日期字串
+        type: string
+      id:
+        description: 贊助紀錄 id（如 d1）
+        type: string
+      name:
+        description: 贊助者名稱
+        type: string
+      note:
+        description: 備註
+        type: string
+      updated_at:
+        type: string
+    type: object
+  model.SiteSetting:
+    properties:
+      aka:
+        type: string
+      announcement:
+        type: string
+      catsBlog:
+        items:
+          type: string
+        type: array
+      catsWorks:
+        items:
+          type: string
+        type: array
+      motto:
+        type: string
+      owner:
+        type: string
+      social:
+        items:
+          $ref: '#/definitions/model.SocialLink'
+        type: array
+      sponsor:
+        $ref: '#/definitions/model.Sponsor'
+      subtitle:
+        type: string
+      tagline:
+        type: string
+      title:
+        type: string
+      titleEn:
+        type: string
+    type: object
+  model.SocialLink:
+    properties:
+      label:
+        type: string
+      url:
+        type: string
+    type: object
+  model.Sponsor:
+    properties:
+      subtitle:
+        type: string
+      tiers:
+        items:
+          $ref: '#/definitions/model.SponsorTier'
+        type: array
+      title:
+        type: string
+    type: object
+  model.SponsorTier:
+    properties:
+      amt:
+        type: integer
+      label:
+        type: string
+    type: object
+  repository.DailyStat:
+    properties:
+      day:
+        type: string
+      views:
+        type: integer
+      visitors:
+        type: integer
     type: object
   response.Envelope:
     properties:
@@ -30,15 +220,107 @@ definitions:
       message:
         type: string
     type: object
+  service.ArticleInput:
+    properties:
+      award:
+        type: string
+      banner:
+        type: string
+      bannerFade:
+        type: boolean
+      blurb:
+        type: string
+      body:
+        type: string
+      cat:
+        type: string
+      date:
+        type: string
+      gallery:
+        items:
+          type: string
+        type: array
+      showcase:
+        type: boolean
+      status:
+        type: string
+      title:
+        type: string
+      workCat:
+        type: string
+      "y":
+        type: integer
+    type: object
+  service.CommentInput:
+    properties:
+      articleId:
+        type: string
+      name:
+        type: string
+      text:
+        type: string
+    type: object
 info:
   contact: {}
   description: LittleDuck 個人網站後端 RESTful API
   title: LittleDuck API
   version: 0.1.0
 paths:
+  /api/v1/admin/articles:
+    get:
+      description: 取得全部文章（含草稿），需管理員身分
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.Article'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Envelope'
+      security:
+      - BearerAuth: []
+      summary: 後台文章列表
+      tags:
+      - articles
+  /api/v1/admin/comments:
+    get:
+      description: 取得全部留言（含 pending／visible／hidden），需管理員身分
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.Comment'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Envelope'
+      security:
+      - BearerAuth: []
+      summary: 後台留言列表
+      tags:
+      - comments
   /api/v1/articles:
     get:
-      description: 取得全部文章（依建立時間新到舊）
+      description: 取得已發布文章（依建立時間新到舊），草稿不列入
       produces:
       - application/json
       responses:
@@ -57,9 +339,350 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.Envelope'
-      summary: 文章列表
+      summary: 公開文章列表
       tags:
       - articles
+    post:
+      consumes:
+      - application/json
+      description: 建立文章（含發布狀態），需管理員身分
+      parameters:
+      - description: 文章內容
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/service.ArticleInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Article'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Envelope'
+      security:
+      - BearerAuth: []
+      summary: 建立文章
+      tags:
+      - articles
+  /api/v1/articles/{id}:
+    delete:
+      description: 刪除文章，需管理員身分
+      parameters:
+      - description: 文章 id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Envelope'
+      security:
+      - BearerAuth: []
+      summary: 刪除文章
+      tags:
+      - articles
+    get:
+      description: 以文章 id 取得單篇完整內容
+      parameters:
+      - description: 文章 id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Article'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Envelope'
+      summary: 讀取單篇文章
+      tags:
+      - articles
+    put:
+      consumes:
+      - application/json
+      description: 修改文章內容與發布狀態，需管理員身分
+      parameters:
+      - description: 文章 id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 文章內容
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/service.ArticleInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Article'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Envelope'
+      security:
+      - BearerAuth: []
+      summary: 修改文章
+      tags:
+      - articles
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: 以管理員帳密換發 JWT 存取權杖
+      parameters:
+      - description: 管理員帳密
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/controller.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.Token'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Envelope'
+      summary: 後台登入
+      tags:
+      - auth
+  /api/v1/comments:
+    get:
+      description: 取得可見（visible）留言，可用 articleId 過濾；pending／hidden 不列入
+      parameters:
+      - description: 文章 id；留空為全部可見留言
+        in: query
+        name: articleId
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.Comment'
+                  type: array
+              type: object
+      summary: 公開留言列表
+      tags:
+      - comments
+    post:
+      consumes:
+      - application/json
+      description: 訪客張貼留言，建立為待審核（pending）狀態
+      parameters:
+      - description: 留言內容
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/service.CommentInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Comment'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Envelope'
+      summary: 張貼留言
+      tags:
+      - comments
+  /api/v1/comments/{id}/reply:
+    put:
+      consumes:
+      - application/json
+      description: 對留言新增管理員回覆，需管理員身分
+      parameters:
+      - description: 留言 id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 回覆內容
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/controller.replyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Comment'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Envelope'
+      security:
+      - BearerAuth: []
+      summary: 回覆留言
+      tags:
+      - comments
+  /api/v1/comments/{id}/status:
+    put:
+      consumes:
+      - application/json
+      description: 將留言狀態改為 pending／visible／hidden，需管理員身分
+      parameters:
+      - description: 留言 id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 目標狀態
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/controller.statusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Comment'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Envelope'
+      security:
+      - BearerAuth: []
+      summary: 變更留言狀態
+      tags:
+      - comments
+  /api/v1/donations:
+    get:
+      description: 取得贊助／付款紀錄清單，需管理員身分（唯讀）
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.Donation'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Envelope'
+      security:
+      - BearerAuth: []
+      summary: 贊助紀錄列表
+      tags:
+      - donations
   /api/v1/payments:
     post:
       consumes:
@@ -90,6 +713,109 @@ paths:
       summary: 綠界付款 callback（未實作）
       tags:
       - payments
+  /api/v1/settings:
+    get:
+      description: 取得前台渲染所需的站台設定（標題、標語、社群連結、公告、贊助級距等）
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.SiteSetting'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Envelope'
+      summary: 讀取網站設定
+      tags:
+      - settings
+    put:
+      consumes:
+      - application/json
+      description: 更新站台設定，需管理員身分；更新後立即反映於公開讀取
+      parameters:
+      - description: 網站設定
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.SiteSetting'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.SiteSetting'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Envelope'
+      security:
+      - BearerAuth: []
+      summary: 更新網站設定
+      tags:
+      - settings
+  /api/v1/stats:
+    get:
+      description: 取得最近 30 天每日 views／visitors 聚合，需管理員身分
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/repository.DailyStat'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Envelope'
+      security:
+      - BearerAuth: []
+      summary: 每日統計
+      tags:
+      - stats
+  /api/v1/stats/pageview:
+    post:
+      consumes:
+      - application/json
+      description: 前台頁面載入時回報一次瀏覽；非阻塞語意，成功回 204
+      parameters:
+      - description: 瀏覽路徑
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/controller.pageviewRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+      summary: 回報瀏覽事件
+      tags:
+      - stats
   /health:
     get:
       description: 回報服務與資料庫連線狀態；資料庫異常時回傳 503

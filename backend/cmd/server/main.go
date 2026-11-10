@@ -11,7 +11,9 @@ import (
 	"littleduck-backend/internal/config"
 	"littleduck-backend/internal/database"
 	"littleduck-backend/internal/pkg/logger"
+	"littleduck-backend/internal/repository"
 	"littleduck-backend/internal/router"
+	"littleduck-backend/internal/seed"
 )
 
 // @title			LittleDuck API
@@ -36,6 +38,16 @@ func main() {
 	}
 	if err := database.AutoMigrate(db, zapLog); err != nil {
 		zapLog.Fatal("資料庫遷移失敗", zap.Error(err))
+	}
+
+	// 各資料域為空時以前端既有種子內容初始化
+	if err := seed.Run(db, seed.Repositories{
+		Article:  repository.NewArticleRepository(db),
+		Comment:  repository.NewCommentRepository(db),
+		Setting:  repository.NewSettingRepository(db),
+		Donation: repository.NewDonationRepository(db),
+	}, zapLog); err != nil {
+		zapLog.Fatal("種子資料寫入失敗", zap.Error(err))
 	}
 
 	r := router.New(cfg, zapLog, db)
