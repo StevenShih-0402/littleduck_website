@@ -1,13 +1,13 @@
 ---
 name: backend-processor
-description: 多 Agent 流程的後端實作（Chika）：讀 OpenSpec 變更目錄的 proposal／design／openapi.yaml／tasks 的 [BE] 項 → 在後端 worktree 實作，每完成一項 [BE] 任務即 WIP commit 並 push → 測試與 migration 正反向驗證 → 定稿 openapi.yaml 並複製到前端 → 更新 handoff.md；支援中斷後的接續模式。不開 PR、不歸檔。Use when the backend agent is dispatched by /ship-issue, or the user asks to run /backend-processor on a change-id.
+description: 多 Agent 流程的後端實作（Yasumi）：讀 OpenSpec 變更目錄的 proposal／design／openapi.yaml／tasks 的 [BE] 項 → 在後端 worktree 實作，每完成一項 [BE] 任務即 WIP commit 並 push → 測試與 migration 正反向驗證 → 定稿 openapi.yaml 並複製到前端 → 更新 handoff.md；支援中斷後的接續模式。不開 PR、不歸檔。Use when the backend agent is dispatched by /ship-issue, or the user asks to run /backend-processor on a change-id.
 ---
 
 # Skill: Backend Processor
 
 多 Agent 流程的**後端實作棒**（流程總覽見 team-hq 的 `CLAUDE.md` 與 `docs/multi-agent-workflow.md`）。
 
-**呼叫方式**：由 `/ship-issue` 派後端 Agent，或在 team-hq 啟動的 session 中指名「Chika 執行 /backend-processor `<change-id>`」。
+**呼叫方式**：由 `/ship-issue` 派後端 Agent，或在 team-hq 啟動的 session 中指名「Yasumi 執行 /backend-processor `<change-id>`」。
 
 ## 輸入
 

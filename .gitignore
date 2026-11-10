@@ -18,6 +18,6 @@ deploy/**/.env
 # Vercel CLI 的本機連結資訊（vercel link／vercel pull 產生）
 .vercel/
 
-# agent-team：每個 issue 的 worktree 與給 Shiori 讀的暫存 diff
+# agent-team：每個 issue 的 worktree 與給 Akafuku 讀的暫存 diff
 /wt/
 review-diff.patch

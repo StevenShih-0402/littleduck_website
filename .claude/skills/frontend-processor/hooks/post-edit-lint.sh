@@ -3,7 +3,7 @@
 # 編輯後自動 lint：PostToolUse hook（matcher: Write|Edit），只對剛編輯的單一 JS／TS 檔在其所屬 repo 根目錄跑 lint。
 #
 # 註冊方式（擇一）：
-#   - team-hq 的前端 Agent 定義 frontmatter `hooks`（見 agent-team 的 yuma.md 範本）
+#   - team-hq 的前端 Agent 定義 frontmatter `hooks`（見 agent-team 的 fujimori.md 範本）
 #   - 前端 repo 的 .claude/settings.json 的 PostToolUse hook
 # stdin 為 Claude Code 的 hook JSON，取 tool_input.file_path；有 jq 用 jq，否則用 python3 解析。
 #
