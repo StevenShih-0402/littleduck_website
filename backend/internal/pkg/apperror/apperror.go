@@ -11,6 +11,7 @@ import (
 // 業務錯誤碼常數
 const (
 	CodeBadRequest     = "BAD_REQUEST"
+	CodeUnauthorized   = "UNAUTHORIZED"
 	CodeNotFound       = "NOT_FOUND"
 	CodeInternal       = "INTERNAL_ERROR"
 	CodeNotImplemented = "NOT_IMPLEMENTED"
@@ -52,6 +53,11 @@ func NotFound(message string) *AppError {
 // BadRequest 建立 400 錯誤
 func BadRequest(message string) *AppError {
 	return New(CodeBadRequest, http.StatusBadRequest, message)
+}
+
+// Unauthorized 建立 401 錯誤
+func Unauthorized(message string) *AppError {
+	return New(CodeUnauthorized, http.StatusUnauthorized, message)
 }
 
 // Internal 包裝底層錯誤為 500 錯誤

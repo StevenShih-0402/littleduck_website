@@ -6,7 +6,9 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 )
 
 // ServerConfig HTTP 伺服器相關組態
@@ -38,6 +40,14 @@ type LogConfig struct {
 	Level string // LOG_LEVEL：debug / info / warn / error，預設 info
 }
 
+// AuthConfig 後台管理員驗證組態（全部必要）
+type AuthConfig struct {
+	AdminUsername string        // ADMIN_USERNAME（必要）：唯一管理員帳號
+	AdminPassword string        // ADMIN_PASSWORD（必要）：唯一管理員密碼
+	JWTSecret     string        // JWT_SECRET（必要）：HS256 簽章秘鑰
+	JWTTTL        time.Duration // JWT_TTL（必要）：權杖有效期（Go duration，如 24h）
+}
+
 // ECPayConfig 綠界金流組態（骨架階段允許留空）
 type ECPayConfig struct {
 	MerchantID string // ECPAY_MERCHANT_ID
@@ -51,15 +61,24 @@ type Config struct {
 	Server ServerConfig
 	DB     DBConfig
 	Log    LogConfig
+	Auth   AuthConfig
 	ECPay  ECPayConfig
 }
 
 // requiredVars 啟動時必須存在的環境變數
-var requiredVars = []string{"DB_HOST", "DB_USER", "DB_PASSWORD", "DB_NAME"}
+var requiredVars = []string{
+	"DB_HOST", "DB_USER", "DB_PASSWORD", "DB_NAME",
+	"ADMIN_USERNAME", "ADMIN_PASSWORD", "JWT_SECRET", "JWT_TTL",
+}
 
 // Load 讀取環境變數組成 Config；必要變數缺漏時回傳列出全部缺漏項的錯誤
 func Load() (*Config, error) {
 	if err := validateRequired(); err != nil {
+		return nil, err
+	}
+
+	ttl, err := parseJWTTTL(os.Getenv("JWT_TTL"))
+	if err != nil {
 		return nil, err
 	}
 
@@ -78,6 +97,12 @@ func Load() (*Config, error) {
 		},
 		Log: LogConfig{
 			Level: getEnv("LOG_LEVEL", "info"),
+		},
+		Auth: AuthConfig{
+			AdminUsername: os.Getenv("ADMIN_USERNAME"),
+			AdminPassword: os.Getenv("ADMIN_PASSWORD"),
+			JWTSecret:     os.Getenv("JWT_SECRET"),
+			JWTTTL:        ttl,
 		},
 		ECPay: ECPayConfig{
 			MerchantID: os.Getenv("ECPAY_MERCHANT_ID"),
@@ -100,6 +125,22 @@ func validateRequired() error {
 		return fmt.Errorf("缺少必要環境變數: %s", strings.Join(missing, ", "))
 	}
 	return nil
+}
+
+// parseJWTTTL 解析 JWT_TTL：支援 Go duration 字面（如 24h、30m），
+// 或純數字時視為秒；解析失敗或非正值回傳錯誤以達成啟動 fail-fast。
+func parseJWTTTL(raw string) (time.Duration, error) {
+	if secs, err := strconv.Atoi(raw); err == nil {
+		raw = fmt.Sprintf("%ds", secs)
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil {
+		return 0, fmt.Errorf("JWT_TTL 格式錯誤（需為 Go duration 如 24h 或秒數）: %q", raw)
+	}
+	if d <= 0 {
+		return 0, fmt.Errorf("JWT_TTL 必須為正值，得到 %q", raw)
+	}
+	return d, nil
 }
 
 // getEnv 讀取環境變數，空值時回傳預設值

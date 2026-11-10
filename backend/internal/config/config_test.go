@@ -6,6 +6,7 @@ package config
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 // setRequiredEnv 設定全部必要環境變數，作為各測試的共用 Arrange 基礎
@@ -15,6 +16,10 @@ func setRequiredEnv(t *testing.T) {
 	t.Setenv("DB_USER", "duck")
 	t.Setenv("DB_PASSWORD", "secret")
 	t.Setenv("DB_NAME", "littleduck")
+	t.Setenv("ADMIN_USERNAME", "admin")
+	t.Setenv("ADMIN_PASSWORD", "admin-pass")
+	t.Setenv("JWT_SECRET", "test-secret")
+	t.Setenv("JWT_TTL", "24h")
 }
 
 func TestLoad_ReadsAllEnvironmentVariables(t *testing.T) {
@@ -50,6 +55,61 @@ func TestLoad_ReadsAllEnvironmentVariables(t *testing.T) {
 	if cfg.ECPay.MerchantID != "2000132" || cfg.ECPay.HashKey != "key" ||
 		cfg.ECPay.HashIV != "iv" || cfg.ECPay.Env != "production" {
 		t.Errorf("ECPay 組態錯誤: %+v", cfg.ECPay)
+	}
+	if cfg.Auth.AdminUsername != "admin" || cfg.Auth.AdminPassword != "admin-pass" ||
+		cfg.Auth.JWTSecret != "test-secret" || cfg.Auth.JWTTTL != 24*time.Hour {
+		t.Errorf("Auth 組態錯誤: %+v", cfg.Auth)
+	}
+}
+
+func TestLoad_ParsesJWTTTLAsSecondsWhenBareInteger(t *testing.T) {
+	// Arrange
+	setRequiredEnv(t)
+	t.Setenv("JWT_TTL", "3600")
+
+	// Act
+	cfg, err := Load()
+
+	// Assert
+	if err != nil {
+		t.Fatalf("Load() 應成功，卻回傳錯誤: %v", err)
+	}
+	if cfg.Auth.JWTTTL != time.Hour {
+		t.Errorf("JWT_TTL=3600 應解析為 1h，得到 %v", cfg.Auth.JWTTTL)
+	}
+}
+
+func TestLoad_FailsWhenJWTTTLInvalid(t *testing.T) {
+	// Arrange
+	setRequiredEnv(t)
+	t.Setenv("JWT_TTL", "not-a-duration")
+
+	// Act
+	_, err := Load()
+
+	// Assert
+	if err == nil {
+		t.Fatal("JWT_TTL 格式錯誤時 Load() 應回傳錯誤")
+	}
+	if !strings.Contains(err.Error(), "JWT_TTL") {
+		t.Errorf("錯誤訊息應提及 JWT_TTL，得到 %q", err.Error())
+	}
+}
+
+func TestLoad_FailsFastWhenAuthVariableMissing(t *testing.T) {
+	// Arrange
+	setRequiredEnv(t)
+	t.Setenv("JWT_SECRET", "")
+
+	// Act
+	_, err := Load()
+
+	// Assert
+	if err == nil {
+		t.Fatal("缺少 JWT_SECRET 時 Load() 應回傳錯誤")
+	}
+	if !strings.Contains(err.Error(), "JWT_SECRET") {
+		t.Errorf("錯誤訊息應指出缺少 JWT_SECRET，得到 %q", err.Error())
 	}
 }
 

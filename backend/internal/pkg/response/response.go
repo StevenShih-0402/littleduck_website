@@ -30,6 +30,20 @@ func OK(c *gin.Context, data any) {
 	})
 }
 
+// Created 輸出 201 成功回應
+func Created(c *gin.Context, data any) {
+	c.JSON(http.StatusCreated, Envelope{
+		Code:    CodeSuccess,
+		Message: "created",
+		Data:    data,
+	})
+}
+
+// NoContentOK 輸出 204（無內容；用於非阻塞回報類端點）
+func NoContentOK(c *gin.Context) {
+	c.Status(http.StatusNoContent)
+}
+
 // Error 依 AppError 輸出對應狀態碼的錯誤回應
 func Error(c *gin.Context, appErr *apperror.AppError) {
 	c.JSON(appErr.Status, Envelope{
