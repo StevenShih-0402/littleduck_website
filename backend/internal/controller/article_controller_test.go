@@ -1,9 +1,10 @@
 // backend/internal/controller/article_controller_test.go
-// article controller 單元測試：以 mock service 驗證成功回應與錯誤轉交 middleware
+// article controller 單元測試：公開列表 envelope、單篇 404、建立 201（mock service）
 
 package controller
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -16,72 +17,92 @@ import (
 	"littleduck-backend/internal/model"
 	"littleduck-backend/internal/pkg/apperror"
 	"littleduck-backend/internal/pkg/response"
+	"littleduck-backend/internal/service"
 )
 
 // mockArticleService 測試用 ArticleService
 type mockArticleService struct {
-	articles []model.Article
-	err      error
+	published []model.Article
+	all       []model.Article
+	one       *model.Article
+	getErr    error
+	created   *model.Article
+	createErr error
 }
 
-func (m *mockArticleService) List() ([]model.Article, error) {
-	return m.articles, m.err
+func (m *mockArticleService) ListPublished() ([]model.Article, error) { return m.published, nil }
+func (m *mockArticleService) ListAll() ([]model.Article, error)       { return m.all, nil }
+func (m *mockArticleService) Get(string) (*model.Article, error)      { return m.one, m.getErr }
+func (m *mockArticleService) Create(service.ArticleInput) (*model.Article, error) {
+	return m.created, m.createErr
 }
+func (m *mockArticleService) Update(string, service.ArticleInput) (*model.Article, error) {
+	return m.one, m.getErr
+}
+func (m *mockArticleService) Delete(string) error { return nil }
 
-// performArticles 掛載 article 路由（含 error handler）並發送請求
-func performArticles(t *testing.T, svc *mockArticleService) *httptest.ResponseRecorder {
-	t.Helper()
+func newArticleRouter(svc service.ArticleService) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(middleware.ErrorHandler(zap.NewNop()))
-	r.GET("/api/v1/articles", NewArticleController(svc).List)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/articles", nil))
-	return rec
+	ctrl := NewArticleController(svc)
+	r.GET("/api/v1/articles", ctrl.List)
+	r.GET("/api/v1/articles/:id", ctrl.Get)
+	r.POST("/api/v1/articles", ctrl.Create)
+	return r
 }
 
-func TestArticleList_ReturnsEnvelopeWithArticles(t *testing.T) {
+func TestArticleList_ReturnsPublishedEnvelope(t *testing.T) {
 	// Arrange
-	svc := &mockArticleService{articles: []model.Article{{Title: "hello"}}}
+	svc := &mockArticleService{published: []model.Article{{ID: "a1", Title: "hello"}}}
+	r := newArticleRouter(svc)
 
 	// Act
-	rec := performArticles(t, svc)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/articles", nil))
 
 	// Assert
 	if rec.Code != http.StatusOK {
-		t.Errorf("status = %d, want 200", rec.Code)
+		t.Fatalf("status = %d, want 200", rec.Code)
 	}
 	var body struct {
 		Code string          `json:"code"`
 		Data []model.Article `json:"data"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("回應不是合法 JSON: %v", err)
-	}
-	if body.Code != response.CodeSuccess {
-		t.Errorf("code = %q, want %q", body.Code, response.CodeSuccess)
-	}
-	if len(body.Data) != 1 || body.Data[0].Title != "hello" {
-		t.Errorf("data 內容錯誤: %+v", body.Data)
+	_ = json.Unmarshal(rec.Body.Bytes(), &body)
+	if body.Code != response.CodeSuccess || len(body.Data) != 1 || body.Data[0].ID != "a1" {
+		t.Errorf("回應內容錯誤: %+v", body)
 	}
 }
 
-func TestArticleList_ServiceErrorHandledByMiddleware(t *testing.T) {
+func TestArticleGet_NotFoundReturns404(t *testing.T) {
 	// Arrange
-	svc := &mockArticleService{err: apperror.Internal(nil, "取得文章列表失敗")}
+	svc := &mockArticleService{getErr: apperror.NotFound("文章不存在")}
+	r := newArticleRouter(svc)
 
 	// Act
-	rec := performArticles(t, svc)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/articles/missing", nil))
 
 	// Assert
-	if rec.Code != http.StatusInternalServerError {
-		t.Errorf("status = %d, want 500", rec.Code)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want 404", rec.Code)
 	}
-	var body map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("回應不是合法 JSON: %v", err)
-	}
-	if body["code"] != apperror.CodeInternal {
-		t.Errorf("code = %v, want %q", body["code"], apperror.CodeInternal)
+}
+
+func TestArticleCreate_Returns201(t *testing.T) {
+	// Arrange
+	svc := &mockArticleService{created: &model.Article{ID: "n1", Title: "新文章"}}
+	r := newArticleRouter(svc)
+
+	// Act
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/articles", bytes.NewBufferString(`{"title":"新文章"}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(rec, req)
+
+	// Assert
+	if rec.Code != http.StatusCreated {
+		t.Errorf("status = %d, want 201", rec.Code)
 	}
 }
