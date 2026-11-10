@@ -21,3 +21,4 @@ deploy/**/.env
 # agent-team：每個 issue 的 worktree 與給 Akafuku 讀的暫存 diff
 /wt/
 review-diff.patch
+frontend/AGENTS.md
