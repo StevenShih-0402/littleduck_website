@@ -137,6 +137,18 @@ steps:
       - cd frontend
       - npm ci
 
+  - name: lint
+    image: node:20-alpine
+    commands:
+      - cd frontend
+      - npm run lint
+
+  - name: typecheck
+    image: node:20-alpine
+    commands:
+      - cd frontend
+      - npm run typecheck
+
   - name: test-design
     image: node:20-alpine
     commands:

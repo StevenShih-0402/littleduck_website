@@ -39,6 +39,8 @@
 | 階段 | 指令 | 失敗時 |
 |------|------|--------|
 | install | `npm ci` | 中止 |
+| lint | `npm run lint`（ESLint，`eslint-config-next/core-web-vitals`） | 有 error 等級的違規即中止；warning 不擋 |
+| typecheck | `npm run typecheck`（`tsc --noEmit`，以 `jsconfig.json` 的 `checkJs` 檢查 JS） | 有型別錯誤即中止 |
 | test-design | `npm run test:design` | 中止 |
 | build | `npm run build` | 中止 |
 | audit | `npm audit --audit-level=high` | 有 high 以上弱點即中止 |
