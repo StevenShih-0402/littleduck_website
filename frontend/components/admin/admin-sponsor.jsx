@@ -6,12 +6,26 @@
 import React from "react";
 import { useLake } from "@/store/lake-context";
 
+// KPI 卡片：定義在模組層，避免每次 render 都建立新的元件型別（react-hooks/static-components）
+const Kpi = ({ label, v, sub }) => (
+  <div className="a-panel p-4">
+    <div className="a-dim mono text-[10px] uppercase tracking-[.15em] mb-1">{label}</div>
+    <div className="ntc font-black text-[26px] leading-none">{v}</div>
+    <div className="a-dim text-[10.5px] mono mt-1">{sub}</div>
+  </div>
+);
+
 export default function AdminSponsor() {
   const { db, updateSettings } = useLake();
   const dons = db.donations || [];
   // 贊助視窗設定以本機表單狀態編輯，按「儲存設定」才 PUT /settings
   const [sp, setSp] = React.useState((db.settings && db.settings.sponsor) || { title: "", subtitle: "", tiers: [] });
-  React.useEffect(() => { if (db.settings && db.settings.sponsor) setSp(db.settings.sponsor); }, [db.settings]);
+  // settings 重新載入後同步表單：在 render 期間比對前一次的值，取代「effect 內 setState」
+  const [prevSettings, setPrevSettings] = React.useState(db.settings);
+  if (db.settings !== prevSettings) {
+    setPrevSettings(db.settings);
+    if (db.settings && db.settings.sponsor) setSp(db.settings.sponsor);
+  }
   const [saved, setSaved] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [err, setErr] = React.useState("");
@@ -37,14 +51,6 @@ export default function AdminSponsor() {
   const month = dons.filter(x => (x.date || "").startsWith("2026 / 07"));
   const monthTotal = month.reduce((s, x) => s + (x.amt || 0), 0);
   const avg = dons.length ? Math.round(total / dons.length) : 0;
-
-  const Kpi = ({ label, v, sub }) => (
-    <div className="a-panel p-4">
-      <div className="a-dim mono text-[10px] uppercase tracking-[.15em] mb-1">{label}</div>
-      <div className="ntc font-black text-[26px] leading-none">{v}</div>
-      <div className="a-dim text-[10.5px] mono mt-1">{sub}</div>
-    </div>
-  );
 
   return (
     <div className="space-y-5">

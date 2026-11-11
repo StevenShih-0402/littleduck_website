@@ -113,6 +113,7 @@ export function Gallery({ images, label, className }) {
 }
 
 // front section header — heavy rule in day, thin in night
+/** @param {{ num: string, zh: string, en: string, sub?: import('react').ReactNode }} props sub 為選填副標 */
 export function SecHead({ num, zh, en, sub }) {
   return (
     <div className="mb-5 theme-fade">

@@ -15,6 +15,7 @@ export default function HomePage() {
   const [view, setView] = React.useState("grid");
   const [ready, setReady] = React.useState(false);
   React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 掛載後才讀 localStorage，避免 SSR hydration 不一致
     setView(localStorage.getItem("lake_home_view") || (theme === "night" ? "list" : "grid"));
     setReady(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -10,8 +10,13 @@ export default function AdminSettings() {
   const { db, updateSettings } = useLake();
   // 本機表單狀態，編輯即時反映；按「儲存設定」才 PUT 到後端
   const [form, setForm] = React.useState(db.settings || {});
-  // settings 由後端載入（或後台重載）後同步一次
-  React.useEffect(() => { if (db.settings) setForm(db.settings); }, [db.settings]);
+  // settings 由後端載入（或後台重載）後同步一次：在 render 期間比對前一次的值，
+  // 取代「effect 內 setState」，避免多一輪 render（React 文件的 adjusting state on prop change 寫法）
+  const [prevSettings, setPrevSettings] = React.useState(db.settings);
+  if (db.settings !== prevSettings) {
+    setPrevSettings(db.settings);
+    if (db.settings) setForm(db.settings);
+  }
 
   const s = form;
   const [saved, setSaved] = React.useState(false);
