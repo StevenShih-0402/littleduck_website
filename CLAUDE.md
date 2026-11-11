@@ -24,15 +24,16 @@
 |------|------|------|
 | 安裝依賴 | 無（`go` 指令自動下載模組） | `npm ci` |
 | 測試 | `go test ./...` | `npm run test:design` |
-| lint | `gofmt -l .`（要沒有輸出）、`go vet ./...` | 無（專案未設定 ESLint） |
-| 型別檢查 | 無（`go vet` 與編譯已涵蓋） | 無（專案未設定 typecheck） |
+| lint | `gofmt -l .`（要沒有輸出）、`go vet ./...` | `npm run lint` |
+| 型別檢查 | 無（`go vet` 與編譯已涵蓋） | `npm run typecheck`（`checkJs`，不轉 TypeScript） |
 | 建置 | — | `npm run build` |
 | 相依套件弱點 | — | `npm audit --audit-level=high` |
 | migration 正反向 | 無獨立 migration 檔，見下 | — |
 | API schema 產出 | 無 | — |
 
 - **資料表變更走 GORM AutoMigrate**（`backend/internal/database/`），沒有獨立的 migration 檔。「migration 正反向」改為：新增的 model 欄位能在空資料庫與既有資料庫上啟動成功（執行驗證時確認），並在 `handoff.md` 註明是否為不相容的 schema 變更。
-- 編輯後的 lint hook：後端只處理 `.py`、前端找不到 ESLint 設定，所以在本專案都不會作用；`gofmt`／`go vet` 要自己跑。
+- 編輯後的 lint hook：前端 hook 會在 `frontend/` 已 `npm ci` 時，對剛編輯的 JS 檔跑 ESLint（設定在 `frontend/eslint.config.mjs`）；後端 hook 只處理 `.py`，在本專案不會作用，`gofmt`／`go vet` 要自己跑。
+- 前端既有的 lint／型別違規只能以帶理由的單行註解豁免（`eslint-disable-next-line <規則> -- 理由`、`@ts-expect-error 理由`），不關閉、不降級規則。
 - 改到設計稿對應的前端檔案時，`frontend/design-sync/manifest.json` 的對應關係要維持正確（見「設計同步」）。
 
 ## Worktree 慣例
@@ -66,6 +67,7 @@
 
 - 同步基準：`frontend/design-sync/manifest.json`，記錄設計來源、各設計檔雜湊與對應的前端檔案
 - 差異工具：在 `frontend/` 執行 `npm run design:check -- <拉取目錄>`，測試用 `npm run test:design`
+- 移植完成後要通過 `npm run lint` 與 `npm run typecheck`（設計稿的寫法可能觸發 lint 規則，移植時一併處理）
 
 ## 交接規則
 
@@ -95,7 +97,7 @@
 
 | 規則性質 | 放哪裡 | 誰檢查 | 何時 |
 |----------|--------|--------|------|
-| 機械性（格式、import 順序） | `gofmt`／`go vet`（CI 與 Teshima 檢查都會跑） | Teshima「檢查」、Drone CI | PR 前、PR 中 |
+| 機械性（格式、import 順序、前端 lint 規則） | 後端 `gofmt`／`go vet`、前端 ESLint `npm run lint`（CI 與 Teshima 檢查都會跑） | Teshima「檢查」、Drone CI | PR 前、PR 中 |
 | 對照 OpenSpec 的需求覆蓋與測試涵蓋 | `/custom-review` | Akafuku（審查模式） | PR 前 |
 | 需要判斷的專案慣例（分層、錯誤格式、命名） | 本檔與 `backend/README.md` | 內建 `/code-review`，Akafuku（評定模式）評級 | PR 中 |
 
