@@ -6,6 +6,15 @@
 import React from "react";
 import { useLake } from "@/store/lake-context";
 
+// KPI 卡片：定義在模組層，避免每次 render 都建立新的元件型別（react-hooks/static-components）
+const Kpi = ({ label, v, sub }) => (
+  <div className="a-panel p-4">
+    <div className="a-dim mono text-[10px] uppercase tracking-[.15em] mb-1">{label}</div>
+    <div className="ntc font-black text-[26px] leading-none">{v}</div>
+    <div className="a-dim text-[10.5px] mono mt-1">{sub}</div>
+  </div>
+);
+
 export default function AdminOverview({ goTab }) {
   const { db } = useLake();
   const days = db.stats.daily || [];
@@ -17,14 +26,6 @@ export default function AdminOverview({ goTab }) {
   const pub = db.articles.filter(a => a.status === "published");
   const top = [...db.articles].sort((a, b) => b.views - a.views).slice(0, 5);
   const pending = db.comments.filter(c => c.status === "pending");
-
-  const Kpi = ({ label, v, sub }) => (
-    <div className="a-panel p-4">
-      <div className="a-dim mono text-[10px] uppercase tracking-[.15em] mb-1">{label}</div>
-      <div className="ntc font-black text-[26px] leading-none">{v}</div>
-      <div className="a-dim text-[10.5px] mono mt-1">{sub}</div>
-    </div>
-  );
 
   return (
     <div className="space-y-5">

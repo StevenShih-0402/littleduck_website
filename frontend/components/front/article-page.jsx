@@ -15,6 +15,7 @@ export default function ArticlePage({ id }) {
   const night = theme === "night";
   const [fs, setFs] = React.useState(14.5);
   React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 掛載後才讀 localStorage，避免 SSR hydration 不一致
     setFs(Number(localStorage.getItem("lake_read_fs")) || 14.5);
   }, []);
   const setFsP = v => { setFs(v); localStorage.setItem("lake_read_fs", v); };

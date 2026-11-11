@@ -3,6 +3,17 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"]
-    }
-  }
+    },
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "jsx": "preserve",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "ES2022",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "skipLibCheck": true
+  },
+  "include": ["app", "components", "data", "lib", "store", "scripts", "*.js", "*.mjs"],
+  "exclude": ["node_modules", ".next"]
 }

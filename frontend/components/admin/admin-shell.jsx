@@ -81,6 +81,7 @@ export default function AdminShell() {
   const [skin, setSkin] = React.useState("neutral");
   const [editId, setEditId] = React.useState(null); // article being edited
   React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 掛載後才讀 localStorage，避免 SSR hydration 不一致
     setSkin(localStorage.getItem("lake_admin_skin") || "neutral");
   }, []);
   // 進入後台時（已登入）確保後台資料（草稿、全部留言、贊助、真實統計）已載入

@@ -21,16 +21,19 @@ export default function AdminEditor({ id, back }) {
   const timer = React.useRef(null);
   const pending = React.useRef(null);
 
-  // 切換文章時同步 draft（以 id 為界，避免把別篇的輸入帶過去）
-  React.useEffect(() => {
-    setDraft(db.articles.find(x => x.id === id) || null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  // 切換文章時同步 draft（以 id 為界，避免把別篇的輸入帶過去）：
+  // 在 render 期間比對前一次的 id，取代「effect 內 setState」
+  const [prevId, setPrevId] = React.useState(id);
+  if (id !== prevId) {
+    setPrevId(id);
+    setDraft(stored || null);
+  }
 
   const [showPrev, setShowPrev] = React.useState(true);
   const [full, setFull] = React.useState(false);
   const [edFs, setEdFs] = React.useState(12.5);
   React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 掛載後才讀 localStorage，避免 SSR hydration 不一致
     setEdFs(Number(localStorage.getItem("lake_editor_fs")) || 12.5);
   }, []);
   const setEdFsP = v => { setEdFs(v); localStorage.setItem("lake_editor_fs", v); };
@@ -143,7 +146,7 @@ export default function AdminEditor({ id, back }) {
           <div className="col-span-12">
             <div className="relative overflow-hidden h-24 border a-line" style={{ borderRadius: "var(--a-rad)" }}>
               <img src={a.banner} alt="" className="w-full h-full object-cover" style={a.bannerFade ? { opacity: .45 } : {}}
-                onError={e => { e.target.style.display = "none"; }} />
+                onError={e => { e.currentTarget.style.display = "none"; }} />
               <div className="absolute bottom-1 right-2 a-dim mono text-[9px]">banner 預覽</div>
             </div>
           </div>
@@ -179,7 +182,7 @@ export default function AdminEditor({ id, back }) {
                     <div key={i} className="flex items-center gap-1.5">
                       <span className="a-dim mono text-[10px] w-5 text-right">{i + 1}</span>
                       <div className="w-12 h-9 shrink-0 overflow-hidden border a-line relative" style={{ borderRadius: "var(--a-rad)" }}>
-                        {g ? <img src={g} alt="" className="w-full h-full object-cover" onError={e => { e.target.style.display = "none"; }} />
+                        {g ? <img src={g} alt="" className="w-full h-full object-cover" onError={e => { e.currentTarget.style.display = "none"; }} />
                            : <div className="a-dim mono text-[8px] flex items-center justify-center h-full">無圖</div>}
                       </div>
                       <input className="a-inp mono text-[11.5px]" value={g} placeholder="/assets/… 或 https://…" onChange={e => setGal(i, e.target.value)} />

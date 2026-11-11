@@ -101,6 +101,7 @@ export function LakeProvider({ children }) {
 
   // 初始化：讀主題、判斷是否已有 token、載入公開資料（若有 token 再載後台）
   React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 掛載後才讀 localStorage，避免 SSR hydration 不一致
     try { setThemeState(localStorage.getItem("lake_theme_v2") || "day"); } catch {}
     const hasToken = !!getToken();
     setAuthed(hasToken);

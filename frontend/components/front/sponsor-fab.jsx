@@ -6,6 +6,7 @@
 import React from "react";
 import { useLake } from "@/store/lake-context";
 
+/** @param {{ size?: number }} props size 省略時為 26 */
 export function HoneyLemonIcon({ size }) {
   return (
     <svg width={size || 26} height={size || 26} viewBox="0 0 24 24" fill="none" aria-hidden="true">
