@@ -5,6 +5,7 @@ package service
 
 import (
 	"errors"
+	"strings"
 
 	"littleduck-backend/internal/model"
 	"littleduck-backend/internal/pkg/apperror"
@@ -46,8 +47,32 @@ func (s *settingService) Update(in model.SiteSetting) (*model.SiteSetting, error
 	if in.Title == "" {
 		return nil, apperror.BadRequest("網站標題不可為空")
 	}
+	for _, link := range in.Social {
+		if !isValidSocialURL(link.URL) {
+			return nil, apperror.BadRequest("社群連結網址格式不正確")
+		}
+	}
 	if err := s.repo.Save(&in); err != nil {
 		return nil, apperror.Internal(err, "更新網站設定失敗")
 	}
 	return &in, nil
+}
+
+// isValidSocialURL 社群連結網址是否合法：空、"#"、單一 "/" 開頭的站內路徑，
+// 或 scheme 為 http／https／mailto（不分大小寫、忽略前後空白）
+func isValidSocialURL(raw string) bool {
+	u := strings.TrimSpace(raw)
+	if u == "" || u == "#" {
+		return true
+	}
+	if strings.HasPrefix(u, "/") {
+		return !strings.HasPrefix(u, "//")
+	}
+	lower := strings.ToLower(u)
+	for _, scheme := range []string{"http:", "https:", "mailto:"} {
+		if strings.HasPrefix(lower, scheme) {
+			return true
+		}
+	}
+	return false
 }

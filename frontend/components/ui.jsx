@@ -4,6 +4,8 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
+import { classifyHref } from "@/lib/safe-url.mjs";
 
 // tiny markdown renderer (headings/bold/italic/code/list/quote/link/hr)
 function mdInline(s) {
@@ -17,7 +19,13 @@ function mdInline(s) {
     if (m[1]) out.push(<strong key={k++}>{m[2]}</strong>);
     else if (m[3]) out.push(<em key={k++}>{m[4]}</em>);
     else if (m[5]) out.push(<code key={k++}>{m[6]}</code>);
-    else if (m[7]) out.push(<a key={k++} href={m[9]} onClick={e => e.preventDefault()}>{m[8]}</a>);
+    // SDP-105：刻意偏離設計稿（原本 preventDefault 使連結無法點擊），改依 classifyHref 分類渲染
+    else if (m[7]) {
+      const { kind, href } = classifyHref(m[9]);
+      if (kind === "internal") out.push(<Link key={k++} href={href}>{m[8]}</Link>);
+      else if (kind === "external") out.push(<a key={k++} href={href} target="_blank" rel="noopener noreferrer">{m[8]}</a>);
+      else out.push(<span key={k++}>{m[8]}</span>);
+    }
     rest = rest.slice(m.index + m[0].length);
   }
   return out;

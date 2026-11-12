@@ -8,6 +8,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLake } from "@/store/lake-context";
 import { SITE } from "@/data/site";
+import { classifyHref } from "@/lib/safe-url.mjs";
 import SponsorFab from "./sponsor-fab";
 
 const NAV = [
@@ -114,9 +115,13 @@ export default function FrontShell({ children }) {
         <div className="max-w-[1100px] mx-auto px-4 sm:px-6 py-5 flex flex-col sm:flex-row gap-2 justify-between mono text-[10.5px] uppercase tracking-[.15em] v-dim">
           <div>{SITE.copyright}</div>
           <div className="flex gap-4">
-            {(db.settings.social || []).map(s => (
-              <a key={s.label} href={s.url} onClick={e => e.preventDefault()} className="hover-rule cursor-pointer">{s.label}</a>
-            ))}
+            {/* SDP-105：刻意偏離設計稿（原本 preventDefault）。依 classifyHref 渲染，佔位或不安全網址顯示為不可點的文字 */}
+            {(db.settings.social || []).map(s => {
+              const { kind, href } = classifyHref(s.url);
+              if (kind === "internal") return <Link key={s.label} href={href} className="hover-rule cursor-pointer">{s.label}</Link>;
+              if (kind === "external") return <a key={s.label} href={href} target="_blank" rel="noopener noreferrer" className="hover-rule cursor-pointer">{s.label}</a>;
+              return <span key={s.label}>{s.label}</span>;
+            })}
           </div>
         </div>
       </footer>

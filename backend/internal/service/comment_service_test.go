@@ -6,6 +6,7 @@ package service
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"littleduck-backend/internal/model"
 	"littleduck-backend/internal/pkg/apperror"
@@ -160,5 +161,33 @@ func TestCommentSetStatus_NotFoundReturns404(t *testing.T) {
 	appErr, ok := apperror.AsAppError(err)
 	if !ok || appErr.Status != http.StatusNotFound {
 		t.Fatalf("不存在留言應回 404，得到 %v", err)
+	}
+}
+
+func TestCommentCreate_DateUsesTaipeiTime(t *testing.T) {
+	cases := []struct {
+		name string
+		now  time.Time
+		want string
+	}{
+		{"UTC 前一日 19:00 跨日", time.Date(2026, 11, 11, 19, 0, 0, 0, time.UTC), "2026 / 11 / 12"},
+		{"UTC 當日 07:00", time.Date(2026, 11, 12, 7, 0, 0, 0, time.UTC), "2026 / 11 / 12"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Arrange
+			svc := &commentService{repo: &mockCommentRepo{}, now: func() time.Time { return tc.now }}
+
+			// Act
+			c, err := svc.Create(CommentInput{Name: "訪客", Text: "你好"})
+
+			// Assert
+			if err != nil {
+				t.Fatalf("張貼應成功: %v", err)
+			}
+			if c.Date != tc.want {
+				t.Errorf("date 應為 %q，得到 %q", tc.want, c.Date)
+			}
+		})
 	}
 }
