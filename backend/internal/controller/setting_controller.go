@@ -50,7 +50,7 @@ func (ctrl *SettingController) Get(c *gin.Context) {
 //	@Security		BearerAuth
 //	@Param			body	body		model.SiteSetting	true	"網站設定"
 //	@Success		200		{object}	response.Envelope{data=model.SiteSetting}
-//	@Failure		400		{object}	response.Envelope
+//	@Failure		400		{object}	response.Envelope	"標題為空，或社群連結網址格式不正確"
 //	@Failure		401		{object}	response.Envelope
 //	@Router			/api/v1/settings [put]
 func (ctrl *SettingController) Update(c *gin.Context) {

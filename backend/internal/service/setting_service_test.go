@@ -76,3 +76,26 @@ func TestSettingGet_NotFoundReturns404(t *testing.T) {
 		t.Fatalf("未初始化設定應回 404，得到 %v", err)
 	}
 }
+
+func TestSettingUpdate_SocialURLValidation(t *testing.T) {
+	valid := []string{"", "#", "/blog/a1", "https://x", "HTTP://X", "mailto:a@b", " https://x "}
+	invalid := []string{"javascript:alert(1)", "JavaScript:x", "data:text/html,x", "//evil.com", "foo/bar", "ftp://x"}
+	for _, u := range valid {
+		repo := &mockSettingRepo{}
+		_, err := NewSettingService(repo).Update(model.SiteSetting{Title: "t", Social: []model.SocialLink{{Label: "a", URL: u}}})
+		if err != nil || repo.saved == nil {
+			t.Errorf("%q 應合法並寫入，得到 %v", u, err)
+		}
+	}
+	for _, u := range invalid {
+		repo := &mockSettingRepo{}
+		_, err := NewSettingService(repo).Update(model.SiteSetting{Title: "t", Social: []model.SocialLink{{Label: "a", URL: u}}})
+		appErr, ok := apperror.AsAppError(err)
+		if !ok || appErr.Status != http.StatusBadRequest || appErr.Message != "社群連結網址格式不正確" {
+			t.Errorf("%q 應回 400，得到 %v", u, err)
+		}
+		if repo.saved != nil {
+			t.Errorf("%q 不應寫入", u)
+		}
+	}
+}
