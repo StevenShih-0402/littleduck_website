@@ -30,7 +30,8 @@ export default function AdminPosts({ openEditor }) {
       const created = await createArticle({
         title: "未命名文章",
         cat: (settings.catsBlog || ["隨筆"])[0],
-        date: Lake.today(), y: 2026, status: "draft", views: 0,
+        // SDP-105：年份取瀏覽器當下，不再寫死 2026（偏離設計稿）
+        date: Lake.today(), y: new Date().getFullYear(), status: "draft", views: 0,
         blurb: "", award: "", banner: "", bannerFade: false,
         showcase: false, workCat: "", gallery: [], body: "",
       });
