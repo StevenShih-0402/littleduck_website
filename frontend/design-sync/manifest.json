@@ -44,6 +44,14 @@
         "components/admin/admin-works.jsx",
         "components/admin/admin-comments.jsx",
         "components/admin/status-pill.jsx"
+      ],
+      "deviations": [
+        {
+          "target": "components/admin/admin-posts.jsx",
+          "issue": "SDP-105",
+          "since": "2026-11-12",
+          "note": "新增文章的 y 改為 new Date().getFullYear()，不寫死 2026"
+        }
       ]
     },
     "project/v2/admin-shell.jsx": {
@@ -84,6 +92,14 @@
         "components/front/home-page.jsx",
         "components/front/guest-page.jsx",
         "components/front/sponsor-fab.jsx"
+      ],
+      "deviations": [
+        {
+          "target": "components/front/front-shell.jsx",
+          "issue": "SDP-105",
+          "since": "2026-11-12",
+          "note": "頁尾社群連結不 preventDefault，改用 lib/safe-url.mjs 分類渲染；佔位或不安全網址顯示為不可點文字"
+        }
       ]
     },
     "project/v2/store.js": {
@@ -99,6 +115,14 @@
       "sha256": "63a67ce5b84933843344f08d4ed99c5f3a1a848dcb3a20241d9ffe05f414f950",
       "targets": [
         "components/ui.jsx"
+      ],
+      "deviations": [
+        {
+          "target": "components/ui.jsx",
+          "issue": "SDP-105",
+          "since": "2026-11-12",
+          "note": "mdInline 的連結不 preventDefault，改用 lib/safe-url.mjs 分類渲染"
+        }
       ]
     }
   }

@@ -162,4 +162,39 @@ describe("design-sync", () => {
       assert.equal(manifest.files["project/v2/ui.jsx"].divergentReason, "改接後端 API，刻意不追隨設計");
     });
   });
+
+  // ── deviations（SDP-105）：局部偏離設計的紀錄 ──
+  describe("偏離紀錄（deviations）", () => {
+    const deviation = { target: "components/ui.jsx", issue: "SDP-105", since: "2026-11-12", note: "連結改由 classifyHref 渲染" };
+    const addDeviation = () => {
+      const m = readManifest();
+      m.files["project/v2/ui.jsx"].deviations = [deviation];
+      writeFileSync(manifestPath, JSON.stringify(m));
+    };
+
+    it("更新基準保留 deviations", () => {
+      addDeviation();
+      write("project/v2/ui.jsx", "ui 已修改");
+      assert.equal(exec("update", pulled, "--version", "v2", "--date", "2026-12-01"), 0);
+      const entry = readManifest().files["project/v2/ui.jsx"];
+      assert.equal(entry.sha256, hash("ui 已修改"));
+      assert.deepEqual(entry.deviations, [deviation]);
+    });
+
+    it("已變更項目的報告列出偏離", () => {
+      addDeviation();
+      write("project/v2/ui.jsx", "ui 已修改");
+      assert.equal(exec("check", pulled), 1);
+      assert.match(output(), /已變更（1）/);
+      assert.match(output(), /保留偏離：components\/ui\.jsx — 連結改由 classifyHref 渲染（SDP-105）/);
+    });
+
+    it("無 deviations 的項目報告不變，更新後也不產生空欄位", () => {
+      write("project/v2/ui.jsx", "ui 已修改");
+      assert.equal(exec("check", pulled), 1);
+      assert.doesNotMatch(output(), /保留偏離/);
+      exec("update", pulled, "--version", "v2", "--date", "2026-12-01");
+      assert.equal("deviations" in readManifest().files["project/v2/ui.jsx"], false);
+    });
+  });
 });

@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit -p jsconfig.json",
     "design:check": "node scripts/design-sync.mjs check",
     "design:update": "node scripts/design-sync.mjs update",
-    "test:design": "node --test scripts/design-sync.test.mjs"
+    "test:design": "node --test scripts/design-sync.test.mjs lib/*.test.mjs"
   },
   "dependencies": {
     "next": "16.4.5",

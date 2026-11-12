@@ -53,7 +53,7 @@ export function diff(manifest, hashes) {
     changed: paths
       // 刻意分歧的對應即使雜湊不同也不列為待同步變更
       .filter(p => baseline[p] && !isDivergent(baseline[p]) && baseline[p].sha256 !== hashes[p])
-      .map(path => ({ path, targets: baseline[path].targets })),
+      .map(path => ({ path, targets: baseline[path].targets, deviations: baseline[path].deviations ?? [] })),
     removed: Object.keys(baseline)
       .filter(p => !hashes[p] && !isDivergent(baseline[p]))
       .sort()
@@ -74,7 +74,8 @@ export function buildManifest(manifest, hashes, version, date) {
     if (isDivergent(prev)) {
       files[path] = { ...prev }; // 原樣保留，不以新雜湊覆寫
     } else {
-      files[path] = { sha256: hashes[path], targets: prev?.targets ?? [] };
+      // SDP-105：deviations 記錄前端局部偏離設計的行為，更新基準時保留
+      files[path] = { sha256: hashes[path], targets: prev?.targets ?? [], ...(prev?.deviations?.length && { deviations: prev.deviations }) };
     }
   }
   // 設計檔已不在拉取範圍，但仍標記為刻意分歧的對應也要保留（避免被當成「移除」丟掉）
@@ -95,7 +96,10 @@ export function formatReport(result) {
   if (added.length + changed.length + removed.length === 0) {
     lines.push("沒有設計變更。");
   } else {
-    section("已變更", changed, item => `→ ${item.targets.join(", ")}`);
+    section("已變更", changed, item => [
+      `→ ${item.targets.join(", ")}`,
+      ...(item.deviations ?? []).map(d => `    保留偏離：${d.target} — ${d.note}（${d.issue}）`),
+    ].join("\n"));
     section("新增", added, () => "→ 尚無前端對應");
     section("移除", removed, item => `原對應 → ${item.targets.join(", ")}`);
   }
