@@ -34,6 +34,9 @@ type CommentService interface {
 	Reply(id, reply string) (*model.Comment, error)
 }
 
+// taipeiZone 留言日期使用的固定 UTC+8 時區（台灣無日光節約，不依賴 zoneinfo）
+var taipeiZone = time.FixedZone("Asia/Taipei", 8*60*60)
+
 // commentService CommentService 實作
 type commentService struct {
 	repo repository.CommentRepository
@@ -73,7 +76,7 @@ func (s *commentService) Create(in CommentInput) (*model.Comment, error) {
 		ID:        fmt.Sprintf("n%d", now.UnixNano()),
 		Name:      in.Name,
 		Text:      in.Text,
-		Date:      now.Format("2006 / 01 / 02"),
+		Date:      now.In(taipeiZone).Format("2006 / 01 / 02"),
 		Status:    model.CommentStatusPending,
 		ArticleID: in.ArticleID,
 	}
