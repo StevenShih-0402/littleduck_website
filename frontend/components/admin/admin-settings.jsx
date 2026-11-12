@@ -124,7 +124,7 @@ export default function AdminSettings() {
         {(s.social || []).map((so, i) => (
           <div key={i} className="grid grid-cols-[140px_1fr_auto] gap-2">
             <input className="a-inp" value={so.label} onChange={e => setSocial(i, "label", e.target.value)} />
-            <input className="a-inp mono text-[12px]" value={so.url} placeholder="https://…" onChange={e => setSocial(i, "url", e.target.value)} />
+            <input className="a-inp mono text-[12px]" value={so.url} placeholder="https://… 或 /路徑" onChange={e => setSocial(i, "url", e.target.value)} />
             <button className="a-btn ntc text-[11px] a-dim" title="刪除" onClick={() => delSocial(i)}>✕</button>
           </div>
         ))}
