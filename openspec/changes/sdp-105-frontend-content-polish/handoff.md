@@ -11,11 +11,11 @@
   integrator 檢查、PR 前審查、CI 或 PR 中檢查退回時改回被退回那一端的 backend／frontend（退回 architect 為 proposal）。
   合併隊列失敗不改階段，停下交給 user。 -->
 
-- **階段**：reviewing <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
-- **最後完成**：PR 前審查
-- **下一步**：Teshima 收尾
+- **階段**：pr-checking <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
+- **最後完成**：integrator 收尾（開 PR）
+- **下一步**：PR 中檢查
 - **暫停原因**：無
-- **更新**：主對話 — 2026-11-12 09:50
+- **更新**：integrator（Teshima）— 2026-11-12
 
 ---
 
@@ -89,3 +89,18 @@
 - **風險**：3.2／3.3／3.5 的瀏覽器點擊行為（內文連結、頁尾不可點文字、後台錯誤訊息顯示）未實機確認，僅由 `classifyHref` 單元測試、build 產物含 `noopener noreferrer`、後端 400 訊息佐證；`backend/docs` swag 產物未重產（400 說明可能是舊文字）；`test:design` 現在也跑 `lib/*.test.mjs`。
 - **規格免同步聲明**：無。
 - **退回**：無
+
+---
+
+## integrator（Teshima）— 收尾 2026-11-12
+
+- **接續**：上一次收尾中斷（本地已重切、尚未推送、PR 未建立）。確認 `git diff ac2aaa6 HEAD` 為空，工作樹乾淨；審查後除 `handoff.md`、`review.md` 外無其他變動，不需重新檢查。
+- **重切前的 SHA（OLD，遠端 WIP HEAD）**：`ac2aaa6318d63a163ba481ff273f49e71c78f64a`
+- **重切起點（FROM）**：`176a122`（merge-base origin/main）
+- **重切後的 commit**：`05833d6` fix(api) 留言日期 UTC+8；`367201e` feat(api) 社群連結驗證；`23b0bd6` feat(web) 連結可點擊；`5a88fa9` fix(web) 後台年份；`b240635` feat(web) design-sync 偏離；`09de519` docs(openspec) 提案與審查紀錄
+- **tree 比對**：`git diff ac2aaa6 HEAD` 為空
+- **推送**：`git push --force-with-lease=<branch>:ac2aaa6...` 成功
+- **PR**：https://github.com/StevenShih-0402/littleduck_website/pull/10
+- **附進 PR 的 review.md 備註**：4 條（中 2、低 2）
+- **風險**：中；3.2／3.3／3.5 瀏覽器點擊行為未實機確認；`backend/docs` swag 產物未重產
+- **收尾 HEAD**：`09de519c0ea5d90ff7ed045a7dadd3eab553b681`
