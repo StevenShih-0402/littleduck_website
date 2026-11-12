@@ -1,0 +1,205 @@
+openapi: 3.0.3
+info:
+  title: LittleDuck Backend API — SDP-105 變動
+  version: 0.1.0-draft
+  description: |
+    只列本次變動的端點（草稿，後端 Agent 實作後就地定稿）。
+    - POST /api/v1/comments：回應 schema 不變，`date` 改以台灣時間（UTC+8）計算。
+    - PUT /api/v1/settings：新增 400 情境，`social[].url` 格式不合法。
+    非破壞性變更。回應封包沿用 backend/internal/pkg/response 的 {code, message, data}。
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/v1/comments:
+    post:
+      tags: [comments]
+      summary: 訪客張貼留言
+      description: 建立 pending 留言；`date` 為台灣時間（UTC+8）當天日期，格式 `YYYY / MM / DD`。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentInput'
+      responses:
+        '201':
+          description: 建立成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Comment'
+        '400':
+          description: 名稱或內容為空
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/settings:
+    put:
+      tags: [settings]
+      summary: 後台更新網站設定
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SiteSetting'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SiteSetting'
+        '400':
+          description: |
+            設定內容不合法，設定維持原狀：
+            - 網站標題為空（既有）
+            - `social[].url` 不是空字串、`#`、站內路徑（單一 `/` 開頭）、`http://`、`https://`、`mailto:` 之一（本次新增，message：`社群連結網址格式不正確`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              example:
+                code: BAD_REQUEST
+                message: 社群連結網址格式不正確
+        '401':
+          description: 未帶有效權杖
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Envelope:
+      type: object
+      properties:
+        code:
+          type: string
+          example: SUCCESS
+        message:
+          type: string
+          example: ok
+    ErrorEnvelope:
+      type: object
+      properties:
+        code:
+          type: string
+          example: BAD_REQUEST
+        message:
+          type: string
+    CommentInput:
+      type: object
+      required: [name, text]
+      properties:
+        name:
+          type: string
+        text:
+          type: string
+        articleId:
+          type: string
+          description: 所屬文章 id；空字串為留言板
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        date:
+          type: string
+          description: 台灣時間（UTC+8）當天日期
+          example: 2026 / 11 / 12
+        text:
+          type: string
+        status:
+          type: string
+          enum: [pending, visible, hidden]
+        reply:
+          type: string
+        articleId:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    SocialLink:
+      type: object
+      properties:
+        label:
+          type: string
+        url:
+          type: string
+          description: 空字串、`#`、站內路徑（單一 `/` 開頭）或 http／https／mailto 網址（scheme 不分大小寫）
+          example: https://github.com/example
+    SponsorTier:
+      type: object
+      properties:
+        amt:
+          type: integer
+        label:
+          type: string
+    Sponsor:
+      type: object
+      properties:
+        title:
+          type: string
+        subtitle:
+          type: string
+        tiers:
+          type: array
+          items:
+            $ref: '#/components/schemas/SponsorTier'
+    SiteSetting:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+        titleEn:
+          type: string
+        owner:
+          type: string
+        aka:
+          type: string
+        tagline:
+          type: string
+        subtitle:
+          type: string
+        motto:
+          type: string
+        announcement:
+          type: string
+        social:
+          type: array
+          items:
+            $ref: '#/components/schemas/SocialLink'
+        catsBlog:
+          type: array
+          items:
+            type: string
+        catsWorks:
+          type: array
+          items:
+            type: string
+        sponsor:
+          $ref: '#/components/schemas/Sponsor'
