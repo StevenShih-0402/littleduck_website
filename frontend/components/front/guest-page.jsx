@@ -7,6 +7,8 @@ import React from "react";
 import { useLake } from "@/store/lake-context";
 import { Lake } from "@/store/lake";
 import { SecHead } from "@/components/ui";
+import FeatureGate from "@/components/feature-gate";
+import { FEATURES } from "@/lib/feature-flags.mjs";
 
 export default function GuestPage() {
   const { db, postComment, theme } = useLake();
@@ -33,7 +35,8 @@ export default function GuestPage() {
     <div className="max-w-[760px]">
       <SecHead num="04" zh="訪客留言板" en="GUESTBOOK"
         sub={theme === "night" ? "$ sign --guestbook — 留言送出後由屋主審核再顯示。" : "讀者來函 — 路過簽到、感想、敲碗都可以，審核後刊登。"} />
-      {/* composer */}
+      {/* composer（功能開關 guestbook：停用時隱藏，管理員預覽時加標示） */}
+      <FeatureGate flag={FEATURES.GUESTBOOK}>
       <div className="v-card p-4 sm:p-5 mb-8 theme-fade">
         <div className="mono text-[10.5px] v-dim mb-3">{theme === "night" ? "$ cat >> guestbook.log" : "LETTERS · 投書欄"}</div>
         <div className="grid sm:grid-cols-[200px_1fr] gap-3 mb-3">
@@ -48,6 +51,7 @@ export default function GuestPage() {
         {sent && <div className="mono text-[11px] v-acc mt-2">✓ 已送出，待屋主審核後顯示。</div>}
         {err && <div className="mono text-[11px] mt-2" style={{ color: "#d14343" }}>✕ {err}</div>}
       </div>
+      </FeatureGate>
       {/* messages */}
       <div className="space-y-4">
         {visible.map(c => (

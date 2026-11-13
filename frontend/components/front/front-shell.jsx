@@ -10,6 +10,8 @@ import { useLake } from "@/store/lake-context";
 import { SITE } from "@/data/site";
 import { classifyHref } from "@/lib/safe-url.mjs";
 import SponsorFab from "./sponsor-fab";
+import FeatureGate from "@/components/feature-gate";
+import { FEATURES } from "@/lib/feature-flags.mjs";
 
 const NAV = [
   { key: "home", href: "/", zh: "首頁", en: "HOME" },
@@ -109,7 +111,7 @@ export default function FrontShell({ children }) {
 
       <main className="max-w-[1100px] mx-auto px-4 sm:px-6 py-8 sm:py-10">{children}</main>
 
-      <SponsorFab />
+      <FeatureGate flag={FEATURES.SPONSOR}>{preview => <SponsorFab preview={preview} />}</FeatureGate>
 
       <footer className="border-t rule-heavy mt-6" style={{ borderTopWidth: "var(--heavy)" }}>
         <div className="max-w-[1100px] mx-auto px-4 sm:px-6 py-5 flex flex-col sm:flex-row gap-2 justify-between mono text-[10.5px] uppercase tracking-[.15em] v-dim">

@@ -25,6 +25,10 @@ export function LakeProvider({ children }) {
   const [error, setError] = React.useState(null);
   const [authed, setAuthed] = React.useState(false);
   const [theme, setThemeState] = React.useState("day");
+  // 功能開關：features 為 { key: boolean }，載入失敗為 {}（fail-closed）；featureList 為後台清單，未驗證前為 null
+  const [features, setFeatures] = React.useState({});
+  const [featuresLoaded, setFeaturesLoaded] = React.useState(false);
+  const [featureList, setFeatureList] = React.useState(null);
 
   const patchDb = React.useCallback(fn => setDb(prev => fn(prev)), []);
 
@@ -41,11 +45,17 @@ export function LakeProvider({ children }) {
   const loadPublic = React.useCallback(async () => {
     setLoading(true);
     setError(null);
+    // 功能開關另外請求：失敗只視為全部停用，不設 error、不影響其他資料
+    const loadFeatures = apiGet("/features")
+      .then(f => setFeatures(f && typeof f === "object" ? f : {}))
+      .catch(() => setFeatures({}))
+      .finally(() => setFeaturesLoaded(true));
     try {
       const [settings, articles, comments] = await Promise.all([
         apiGet("/settings"),
         apiGet("/articles"),
         apiGet("/comments"),
+        loadFeatures,
       ]);
       setDb(prev => ({
         ...prev,
@@ -63,6 +73,10 @@ export function LakeProvider({ children }) {
   // ── 後台資料：authed 時載入 admin 文章/留言/贊助/統計並合併 ──
   const reloadAdmin = React.useCallback(async () => {
     if (!getToken()) return;
+    // 後台開關清單：成功才進入前台管理員預覽；失敗（含 401）維持 null
+    apiGet("/admin/features")
+      .then(list => setFeatureList(Array.isArray(list) ? list : null))
+      .catch(() => setFeatureList(null));
     try {
       const [articles, comments, donations, stats] = await Promise.all([
         apiGet("/admin/articles"),
@@ -88,6 +102,7 @@ export function LakeProvider({ children }) {
   const logout = React.useCallback(() => {
     clearToken();
     setAuthed(false);
+    setFeatureList(null);
     // 登出後退回只含公開資料（清掉草稿/全部留言/贊助/統計）
     loadPublic();
   }, [loadPublic]);
@@ -95,6 +110,7 @@ export function LakeProvider({ children }) {
   React.useEffect(() => {
     setUnauthorizedHandler(() => {
       setAuthed(false);
+      setFeatureList(null);
     });
     return () => setUnauthorizedHandler(null);
   }, []);
@@ -177,6 +193,15 @@ export function LakeProvider({ children }) {
     return updated;
   }, []);
 
+  // ── Feature flags action：成功後同步 features 與 featureList ──
+  const setFeatureEnabled = React.useCallback(async (key, enabled) => {
+    const updated = await apiPut("/features/" + key, { enabled });
+    const next = updated && typeof updated.enabled === "boolean" ? updated.enabled : enabled;
+    setFeatures(prev => ({ ...prev, [key]: next }));
+    setFeatureList(prev => (prev ? prev.map(f => (f.key === key ? { ...f, ...(updated || {}), enabled: next } : f)) : prev));
+    return updated;
+  }, []);
+
   // ── Stats：瀏覽回報，fire-and-forget（絕不丟錯） ──
   const reportPageview = React.useCallback((path) => {
     apiPost("/stats/pageview", { path }).catch(() => {});
@@ -188,6 +213,8 @@ export function LakeProvider({ children }) {
     createArticle, updateArticle, deleteArticle,
     postComment, setCommentStatus, replyComment,
     updateSettings, reportPageview,
+    features, featuresLoaded, featureList, adminPreview: authed && featureList !== null,
+    setFeatureEnabled,
   };
 
   return <LakeCtx.Provider value={value}>{children}</LakeCtx.Provider>;
