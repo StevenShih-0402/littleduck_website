@@ -11,10 +11,10 @@
   integrator 檢查、PR 前審查、CI 或 PR 中檢查退回時改回被退回那一端的 backend／frontend（退回 architect 為 proposal）。
   合併隊列失敗不改階段，停下交給 user。 -->
 
-- **階段**：pr-checking <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
+- **階段**：awaiting-approval <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
 - **最後完成**：PR 中檢查
 - **下一步**：風險審批
-- **暫停原因**：無
+- **暫停原因**：高風險，等待 user 回覆合併
 - **更新**：主對話 — 2026-11-13
 
 ---
