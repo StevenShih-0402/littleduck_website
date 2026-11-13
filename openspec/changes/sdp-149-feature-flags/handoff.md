@@ -11,9 +11,9 @@
   integrator 檢查、PR 前審查、CI 或 PR 中檢查退回時改回被退回那一端的 backend／frontend（退回 architect 為 proposal）。
   合併隊列失敗不改階段，停下交給 user。 -->
 
-- **階段**：reviewing <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
-- **最後完成**：PR 前審查
-- **下一步**：Teshima 收尾
+- **階段**：pr-checking <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
+- **最後完成**：integrator 收尾（開 PR）
+- **下一步**：PR 中檢查
 - **暫停原因**：無
 - **更新**：主對話 — 2026-11-13
 
@@ -69,3 +69,14 @@
 - **風險**：命中高風險樣式（model、middleware、database 相關），PR 需等 user 回覆「合併」；根目錄 CLAUDE.md 由主對話另 commit。畫面層行為（隱藏區塊、預覽標示）僅由單元測試與審查涵蓋，未實機截圖。
 - **規格免同步聲明**：無。
 - **退回**：無
+
+## integrator（Teshima）— 收尾
+
+- **重切前 SHA（OLD）**：`fd569a236e2e630408aff662a81405e40997689f`
+- **重切起點（FROM）**：`7bd7aa3efd6db432622d2c5d20f41cd22306f04b`（merge-base，尚無 PR）
+- **重切後 commit**：`151bd02` feat(api)、`4acbc67` feat(web)、`d113284` docs（CLAUDE.md）、`74faff8` docs(openspec)
+- **tree 比對**：`git diff OLD HEAD` 為空
+- **PR**：https://github.com/StevenShih-0402/littleduck_website/pull/11
+- **PR 備註**：3 條（review.md 的 #1 中、#2 低、#3 低）已附進 PR 內文
+- **風險**：命中高風險樣式（資料表結構），需 user 回覆「合併」
+- **收尾 HEAD**：`74faff8251a83f2bb98e244cc1bd2e29052004b5`
