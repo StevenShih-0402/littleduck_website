@@ -93,6 +93,17 @@
 
 合併後的部署（Staging → promote → Production）由 Drone 的 CD 負責，不在本流程內，見 `docs/deployment-runbook.md`。
 
+## 功能開關（SDP-149）
+
+- 前台新增一般瀏覽者可操作的功能（表單、按鈕、互動區塊）時，MUST 同時：
+  1. 在後端功能開關登記表（`backend/internal/service/feature_service.go` 的 `featureRegistry`）新增一個 key，新功能預設**停用**（`Default: false`）；
+  2. 在前端 `frontend/lib/feature-flags.mjs` 的 `FEATURES` 加上同一個 key，並以 `FeatureGate`（`frontend/components/feature-gate.jsx`）包住該操作區塊：啟用時顯示，停用時一般瀏覽者看不到；
+  3. 若該功能有公開寫入端點，後端在開關停用時回 403 `FEATURE_DISABLED`，但帶有效管理員 JWT 的請求放行（管理員預覽，路由掛 `middleware.OptionalAuth`）。
+- 只藏操作區塊，不藏導覽與既有公開內容。
+- 管理員預覽：管理員在後台登入後，同一分頁的前台會顯示停用中的區塊並標示「停用中・預覽」，可實際試用；確認無誤後到後台「功能開關」分頁啟用才對外開放。預覽時送出的資料會寫進真實資料庫，試用後要自行清理。
+- 開關讀取失敗一律視為停用（fail-closed），頁面其他內容照常顯示。
+- 功能穩定、不再需要開關時，另開 issue 移除開關與相關判斷，不留永久開關。
+
 ## 審查規則三分法
 
 | 規則性質 | 放哪裡 | 誰檢查 | 何時 |
