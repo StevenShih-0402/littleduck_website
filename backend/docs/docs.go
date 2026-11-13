@@ -107,6 +107,52 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/admin/features": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "依登記表順序回傳全部開關（含名稱、說明、狀態、更新時間），需管理員身分",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "features"
+                ],
+                "summary": "後台功能開關清單",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/service.FeatureView"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Envelope"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/articles": {
             "get": {
                 "description": "取得已發布文章（依建立時間新到舊），草稿不列入",
@@ -475,7 +521,7 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "訪客張貼留言，建立為待審核（pending）狀態",
+                "description": "訪客張貼留言，建立為待審核（pending）狀態。對應功能開關（留言板 guestbook／文章留言 article_comments）停用時回 403 FEATURE_DISABLED。\n可選帶管理員 Authorization: Bearer；權杖有效時略過功能開關（管理員預覽），無效或過期的權杖視同訪客、不回 401。",
                 "consumes": [
                     "application/json"
                 ],
@@ -487,6 +533,12 @@ const docTemplate = `{
                 ],
                 "summary": "張貼留言",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "選用：Bearer \u003c管理員 JWT\u003e",
+                        "name": "Authorization",
+                        "in": "header"
+                    },
                     {
                         "description": "留言內容",
                         "name": "body",
@@ -518,6 +570,18 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Envelope"
+                        }
+                    },
+                    "403": {
+                        "description": "功能已停用（FEATURE_DISABLED）",
+                        "schema": {
+                            "$ref": "#/definitions/response.Envelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/response.Envelope"
                         }
@@ -717,6 +781,117 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/features": {
+            "get": {
+                "description": "取得 {key: 是否啟用} 對照表，只含布林值，不含名稱與說明",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "features"
+                ],
+                "summary": "讀取功能開關",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "type": "boolean"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/features/{key}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "啟用或停用指定功能，需管理員身分；立即反映於公開讀取",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "features"
+                ],
+                "summary": "切換功能開關",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "開關 key",
+                        "name": "key",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "目標狀態",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controller.featureUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/service.FeatureView"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "缺少 enabled 或型別錯誤",
+                        "schema": {
+                            "$ref": "#/definitions/response.Envelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Envelope"
+                        }
+                    },
+                    "404": {
+                        "description": "未知 key",
+                        "schema": {
+                            "$ref": "#/definitions/response.Envelope"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/payments": {
             "post": {
                 "description": "建立綠界付款交易；骨架階段回傳 501",
@@ -848,7 +1023,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "標題為空，或社群連結網址格式不正確",
                         "schema": {
                             "$ref": "#/definitions/response.Envelope"
                         }
@@ -974,6 +1149,14 @@ const docTemplate = `{
                 },
                 "token": {
                     "type": "string"
+                }
+            }
+        },
+        "controller.featureUpdateRequest": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
                 }
             }
         },
@@ -1346,6 +1529,26 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "text": {
+                    "type": "string"
+                }
+            }
+        },
+        "service.FeatureView": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "updated_at": {
                     "type": "string"
                 }
             }

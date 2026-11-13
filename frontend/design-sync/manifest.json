@@ -61,6 +61,14 @@
         "components/admin/admin-overview.jsx",
         "components/admin/admin-sponsor.jsx",
         "components/admin/admin-settings.jsx"
+      ],
+      "deviations": [
+        {
+          "target": "components/admin/admin-shell.jsx",
+          "issue": "SDP-149",
+          "since": "2026-11-13",
+          "note": "ADMIN_TABS 新增「功能開關」分頁（components/admin/admin-features.jsx，非設計稿元件）"
+        }
       ]
     },
     "project/v2/app.jsx": {
@@ -75,6 +83,14 @@
         "app/(front)/works/page.jsx",
         "app/(front)/guest/page.jsx",
         "app/admin/page.jsx"
+      ],
+      "deviations": [
+        {
+          "target": "store/lake-context.jsx",
+          "issue": "SDP-149",
+          "since": "2026-11-13",
+          "note": "新增功能開關狀態：features、featuresLoaded、featureList、adminPreview、setFeatureEnabled；載入失敗視為全部停用"
+        }
       ]
     },
     "project/v2/front-content.jsx": {
@@ -83,6 +99,14 @@
         "components/front/blog-page.jsx",
         "components/front/article-page.jsx",
         "components/front/works-page.jsx"
+      ],
+      "deviations": [
+        {
+          "target": "components/front/article-page.jsx",
+          "issue": "SDP-149",
+          "since": "2026-11-13",
+          "note": "文章留言表單以 FeatureGate（article_comments）包住；停用時隱藏，管理員預覽時加「停用中・預覽」標示，公開留言列表照常顯示"
+        }
       ]
     },
     "project/v2/front-home.jsx": {
@@ -99,6 +123,24 @@
           "issue": "SDP-105",
           "since": "2026-11-12",
           "note": "頁尾社群連結不 preventDefault，改用 lib/safe-url.mjs 分類渲染；佔位或不安全網址顯示為不可點文字"
+        },
+        {
+          "target": "components/front/front-shell.jsx",
+          "issue": "SDP-149",
+          "since": "2026-11-13",
+          "note": "SponsorFab 以 FeatureGate（sponsor）包住，停用時隱藏，管理員預覽時傳 preview"
+        },
+        {
+          "target": "components/front/guest-page.jsx",
+          "issue": "SDP-149",
+          "since": "2026-11-13",
+          "note": "投書表單以 FeatureGate（guestbook）包住；停用時隱藏，管理員預覽時加標示"
+        },
+        {
+          "target": "components/front/sponsor-fab.jsx",
+          "issue": "SDP-149",
+          "since": "2026-11-13",
+          "note": "新增 preview prop，預覽時在浮動按鈕旁與視窗標題列顯示「停用中・預覽」小標"
         }
       ]
     },

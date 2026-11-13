@@ -14,6 +14,7 @@ import (
 	"littleduck-backend/internal/repository"
 	"littleduck-backend/internal/router"
 	"littleduck-backend/internal/seed"
+	"littleduck-backend/internal/service"
 )
 
 // @title			LittleDuck API
@@ -46,6 +47,7 @@ func main() {
 		Comment:  repository.NewCommentRepository(db),
 		Setting:  repository.NewSettingRepository(db),
 		Donation: repository.NewDonationRepository(db),
+		Features: service.NewFeatureService(repository.NewFeatureRepository(db)),
 	}, zapLog); err != nil {
 		zapLog.Fatal("種子資料寫入失敗", zap.Error(err))
 	}

@@ -107,3 +107,19 @@ func TestAsAppError_ReturnsFalseForPlainError(t *testing.T) {
 		t.Error("一般 error 不應被辨識為 AppError")
 	}
 }
+
+func TestFeatureDisabled_Returns403WithCode(t *testing.T) {
+	// Act
+	err := FeatureDisabled("功能已停用")
+
+	// Assert
+	if err.Status != http.StatusForbidden {
+		t.Errorf("Status = %d, want 403", err.Status)
+	}
+	if err.Code != "FEATURE_DISABLED" {
+		t.Errorf("Code = %q, want FEATURE_DISABLED", err.Code)
+	}
+	if err.Message != "功能已停用" {
+		t.Errorf("Message = %q", err.Message)
+	}
+}

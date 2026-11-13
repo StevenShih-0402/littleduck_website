@@ -60,8 +60,10 @@ func New(cfg *config.Config, log *zap.Logger, db *gorm.DB) *gin.Engine {
 	articleCtrl := controller.NewArticleController(
 		service.NewArticleService(repository.NewArticleRepository(db)),
 	)
+	featureSvc := service.NewFeatureService(repository.NewFeatureRepository(db))
+	featureCtrl := controller.NewFeatureController(featureSvc)
 	commentCtrl := controller.NewCommentController(
-		service.NewCommentService(repository.NewCommentRepository(db)),
+		service.NewCommentService(repository.NewCommentRepository(db), featureSvc),
 	)
 	settingCtrl := controller.NewSettingController(
 		service.NewSettingService(repository.NewSettingRepository(db)),
@@ -83,7 +85,10 @@ func New(cfg *config.Config, log *zap.Logger, db *gorm.DB) *gin.Engine {
 		v1.GET("/articles/:id", articleCtrl.Get)
 
 		v1.GET("/comments", commentCtrl.List)
-		v1.POST("/comments", commentCtrl.Create)
+		// 選用驗證：有效管理員權杖可略過功能開關（預覽），無效權杖視同訪客
+		v1.POST("/comments", middleware.OptionalAuth(authSvc), commentCtrl.Create)
+
+		v1.GET("/features", featureCtrl.Public)
 
 		v1.GET("/settings", settingCtrl.Get)
 
@@ -107,6 +112,9 @@ func New(cfg *config.Config, log *zap.Logger, db *gorm.DB) *gin.Engine {
 		admin.PUT("/comments/:id/reply", commentCtrl.Reply)
 
 		admin.PUT("/settings", settingCtrl.Update)
+
+		admin.GET("/admin/features", featureCtrl.AdminList)
+		admin.PUT("/features/:key", featureCtrl.Update)
 
 		admin.GET("/stats", statCtrl.Daily)
 

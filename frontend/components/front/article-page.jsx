@@ -7,6 +7,8 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { useLake } from "@/store/lake-context";
 import { SecHead, Markdown } from "@/components/ui";
+import FeatureGate from "@/components/feature-gate";
+import { FEATURES } from "@/lib/feature-flags.mjs";
 
 export default function ArticlePage({ id }) {
   const { db, loading, theme } = useLake();
@@ -146,6 +148,7 @@ function ArticleComments({ article }) {
         ))}
         {list.length === 0 && <div className="mono text-[11px] v-dim">{night ? "(empty) — 頭香" : "頭香！"}</div>}
       </div>
+      <FeatureGate flag={FEATURES.ARTICLE_COMMENTS}>
       <div className="v-card p-4 theme-fade">
         <div className="grid sm:grid-cols-[180px_1fr] gap-2.5 mb-2.5">
           <input className="inp ntc" placeholder="暱稱（可留空）" value={name} onChange={e => setName(e.target.value)} maxLength={20} />
@@ -156,6 +159,7 @@ function ArticleComments({ article }) {
           <button className="btn btn-acc ntc" onClick={submit}>送出留言</button>
         </div>
       </div>
+      </FeatureGate>
       </React.Fragment>
       )}
     </div>

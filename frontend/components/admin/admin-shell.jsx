@@ -13,6 +13,7 @@ import AdminWorks from "./admin-works";
 import AdminComments from "./admin-comments";
 import AdminSponsor from "./admin-sponsor";
 import AdminSettings from "./admin-settings";
+import AdminFeatures from "./admin-features";
 
 function AdminLogin() {
   const router = useRouter();
@@ -72,6 +73,7 @@ const ADMIN_TABS = [
   { key: "cmts", zh: "留言管理", icon: "◍" },
   { key: "spon", zh: "贊助管理", icon: "◈" },
   { key: "set", zh: "網站設定", icon: "⚙" },
+  { key: "flags", zh: "功能開關", icon: "⚑" },
 ];
 
 export default function AdminShell() {
@@ -144,6 +146,7 @@ export default function AdminShell() {
           {tab === "cmts" && <AdminComments />}
           {tab === "spon" && <AdminSponsor />}
           {tab === "set" && <AdminSettings />}
+          {tab === "flags" && <AdminFeatures />}
         </div>
       </div>
     </div>

@@ -5,6 +5,7 @@
 
 import React from "react";
 import { useLake } from "@/store/lake-context";
+import { PreviewBadge } from "@/components/feature-gate";
 
 /** @param {{ size?: number }} props size 省略時為 26 */
 export function HoneyLemonIcon({ size }) {
@@ -19,7 +20,8 @@ export function HoneyLemonIcon({ size }) {
   );
 }
 
-export default function SponsorFab() {
+/** @param {{ preview?: boolean }} props preview 為 true 時（功能停用、管理員預覽）顯示「停用中・預覽」小標 */
+export default function SponsorFab({ preview }) {
   const { db, theme } = useLake();
   const sp = (db.settings && db.settings.sponsor) || { title: "請小鴨喝杯蜂蜜檸檬", subtitle: "", tiers: [] };
   const tiers = sp.tiers || [];
@@ -44,6 +46,9 @@ export default function SponsorFab() {
         style={{ boxShadow: "0 4px 18px color-mix(in srgb, var(--acc) 45%, transparent)" }}>
         <HoneyLemonIcon />
       </button>
+      {preview && (
+        <div className="fixed bottom-24 right-5 z-50"><PreviewBadge /></div>
+      )}
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4" onClick={() => !thanks && setOpen(false)}
@@ -61,6 +66,7 @@ export default function SponsorFab() {
                 <div className="flex items-center gap-3 mb-1">
                   <span className="v-acc"><HoneyLemonIcon size={30} /></span>
                   <div className="ntc font-black text-[17px]">{sp.title}</div>
+                  {preview && <PreviewBadge />}
                 </div>
                 {sp.subtitle && <div className="ntc text-[12px] v-dim mb-1.5">{sp.subtitle}</div>}
                 <div className="mono text-[10.5px] v-dim mb-5">{theme === "night" ? "$ donate --to=duck" : "SUPPORT · 贊助創作"}</div>

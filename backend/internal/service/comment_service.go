@@ -26,8 +26,8 @@ type CommentService interface {
 	ListVisible(articleID string) ([]model.Comment, error)
 	// ListAll 後台讀取：全部留言
 	ListAll() ([]model.Comment, error)
-	// Create 訪客張貼：預設 pending
-	Create(in CommentInput) (*model.Comment, error)
+	// Create 張貼留言：預設 pending；asAdmin 為 true（管理員預覽）時略過功能開關檢查
+	Create(in CommentInput, asAdmin bool) (*model.Comment, error)
 	// SetStatus 後台變更狀態
 	SetStatus(id, status string) (*model.Comment, error)
 	// Reply 後台回覆
@@ -39,13 +39,14 @@ var taipeiZone = time.FixedZone("Asia/Taipei", 8*60*60)
 
 // commentService CommentService 實作
 type commentService struct {
-	repo repository.CommentRepository
-	now  func() time.Time
+	repo     repository.CommentRepository
+	features FeatureChecker
+	now      func() time.Time
 }
 
 // NewCommentService 建立 CommentService
-func NewCommentService(repo repository.CommentRepository) CommentService {
-	return &commentService{repo: repo, now: time.Now}
+func NewCommentService(repo repository.CommentRepository, features FeatureChecker) CommentService {
+	return &commentService{repo: repo, features: features, now: time.Now}
 }
 
 // ListVisible 取得可見留言
@@ -66,10 +67,17 @@ func (s *commentService) ListAll() ([]model.Comment, error) {
 	return comments, nil
 }
 
-// Create 建立 pending 留言；缺名稱或內容回 400
-func (s *commentService) Create(in CommentInput) (*model.Comment, error) {
+// Create 建立 pending 留言；缺名稱或內容回 400。
+// 非管理員時依 articleId 檢查功能開關（空＝guestbook，其餘＝article_comments）：
+// 停用回 403 FEATURE_DISABLED，讀取失敗回 500（fail-closed）。
+func (s *commentService) Create(in CommentInput, asAdmin bool) (*model.Comment, error) {
 	if in.Name == "" || in.Text == "" {
 		return nil, apperror.BadRequest("留言名稱與內容不可為空")
+	}
+	if !asAdmin {
+		if err := s.ensureEnabled(in.ArticleID); err != nil {
+			return nil, err
+		}
 	}
 	now := s.now()
 	c := &model.Comment{
@@ -84,6 +92,25 @@ func (s *commentService) Create(in CommentInput) (*model.Comment, error) {
 		return nil, apperror.Internal(err, "建立留言失敗")
 	}
 	return c, nil
+}
+
+// ensureEnabled 檢查張貼對應的功能開關
+func (s *commentService) ensureEnabled(articleID string) error {
+	key, label := FeatureArticleComments, "文章留言"
+	if articleID == "" {
+		key, label = FeatureGuestbook, "留言板投書"
+	}
+	enabled, err := s.features.IsEnabled(key)
+	if err != nil {
+		if _, ok := apperror.AsAppError(err); ok {
+			return err
+		}
+		return apperror.Internal(err, "取得功能開關失敗")
+	}
+	if !enabled {
+		return apperror.FeatureDisabled(label + "功能目前已停用")
+	}
+	return nil
 }
 
 // SetStatus 變更留言狀態（需為合法狀態）
