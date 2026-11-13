@@ -6,6 +6,7 @@ package router
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"go.uber.org/zap"
@@ -63,5 +64,60 @@ func TestNew_MountsAPIV1Routes(t *testing.T) {
 		if rec.Code == http.StatusNotFound {
 			t.Errorf("%s %s 未掛載（404）", tc.method, tc.path)
 		}
+	}
+}
+
+func TestNew_MountsFeatureRoutes(t *testing.T) {
+	// Arrange
+	r := newTestRouter()
+
+	// Act & Assert：公開對照表與後台路由皆已掛載（非 404）
+	for _, tc := range []struct{ method, path string }{
+		{http.MethodGet, "/api/v1/features"},
+		{http.MethodGet, "/api/v1/admin/features"},
+		{http.MethodPut, "/api/v1/features/guestbook"},
+	} {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(tc.method, tc.path, nil))
+		if rec.Code == http.StatusNotFound {
+			t.Errorf("%s %s 未掛載（404）", tc.method, tc.path)
+		}
+	}
+}
+
+func TestNew_FeatureAdminRoutesRequireAuth(t *testing.T) {
+	// Arrange
+	r := newTestRouter()
+
+	// Act & Assert：未帶權杖一律 401
+	for _, tc := range []struct{ method, path string }{
+		{http.MethodGet, "/api/v1/admin/features"},
+		{http.MethodPut, "/api/v1/features/guestbook"},
+	} {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(tc.method, tc.path, strings.NewReader(`{"enabled":false}`)))
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("%s %s 未帶權杖 status = %d, want 401", tc.method, tc.path, rec.Code)
+		}
+	}
+}
+
+func TestNew_PostCommentWithInvalidTokenIsNot401(t *testing.T) {
+	// Arrange
+	r := newTestRouter()
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/comments", strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer invalid.token.value")
+
+	// Act：空內容在驗證階段即回 400（不會碰資料庫）
+	r.ServeHTTP(rec, req)
+
+	// Assert：無效權杖視同訪客，不得被 middleware 擋成 401
+	if rec.Code == http.StatusUnauthorized {
+		t.Errorf("POST /comments 帶無效權杖不應回 401，得到 %d", rec.Code)
+	}
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", rec.Code)
 	}
 }

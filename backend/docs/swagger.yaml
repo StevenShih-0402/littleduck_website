@@ -7,6 +7,11 @@ definitions:
       token:
         type: string
     type: object
+  controller.featureUpdateRequest:
+    properties:
+      enabled:
+        type: boolean
+    type: object
   controller.healthStatus:
     properties:
       database:
@@ -260,6 +265,19 @@ definitions:
       text:
         type: string
     type: object
+  service.FeatureView:
+    properties:
+      description:
+        type: string
+      enabled:
+        type: boolean
+      key:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
 info:
   contact: {}
   description: LittleDuck 個人網站後端 RESTful API
@@ -318,6 +336,32 @@ paths:
       summary: 後台留言列表
       tags:
       - comments
+  /api/v1/admin/features:
+    get:
+      description: 依登記表順序回傳全部開關（含名稱、說明、狀態、更新時間），需管理員身分
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/service.FeatureView'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Envelope'
+      security:
+      - BearerAuth: []
+      summary: 後台功能開關清單
+      tags:
+      - features
   /api/v1/articles:
     get:
       description: 取得已發布文章（依建立時間新到舊），草稿不列入
@@ -542,8 +586,14 @@ paths:
     post:
       consumes:
       - application/json
-      description: 訪客張貼留言，建立為待審核（pending）狀態
+      description: |-
+        訪客張貼留言，建立為待審核（pending）狀態。對應功能開關（留言板 guestbook／文章留言 article_comments）停用時回 403 FEATURE_DISABLED。
+        可選帶管理員 Authorization: Bearer；權杖有效時略過功能開關（管理員預覽），無效或過期的權杖視同訪客、不回 401。
       parameters:
+      - description: 選用：Bearer <管理員 JWT>
+        in: header
+        name: Authorization
+        type: string
       - description: 留言內容
         in: body
         name: body
@@ -564,6 +614,14 @@ paths:
               type: object
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Envelope'
+        "403":
+          description: 功能已停用（FEATURE_DISABLED）
+          schema:
+            $ref: '#/definitions/response.Envelope'
+        "500":
+          description: Internal Server Error
           schema:
             $ref: '#/definitions/response.Envelope'
       summary: 張貼留言
@@ -683,6 +741,72 @@ paths:
       summary: 贊助紀錄列表
       tags:
       - donations
+  /api/v1/features:
+    get:
+      description: '取得 {key: 是否啟用} 對照表，只含布林值，不含名稱與說明'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  additionalProperties:
+                    type: boolean
+                  type: object
+              type: object
+      summary: 讀取功能開關
+      tags:
+      - features
+  /api/v1/features/{key}:
+    put:
+      consumes:
+      - application/json
+      description: 啟用或停用指定功能，需管理員身分；立即反映於公開讀取
+      parameters:
+      - description: 開關 key
+        in: path
+        name: key
+        required: true
+        type: string
+      - description: 目標狀態
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/controller.featureUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/service.FeatureView'
+              type: object
+        "400":
+          description: 缺少 enabled 或型別錯誤
+          schema:
+            $ref: '#/definitions/response.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Envelope'
+        "404":
+          description: 未知 key
+          schema:
+            $ref: '#/definitions/response.Envelope'
+      security:
+      - BearerAuth: []
+      summary: 切換功能開關
+      tags:
+      - features
   /api/v1/payments:
     post:
       consumes:
@@ -759,7 +883,7 @@ paths:
                   $ref: '#/definitions/model.SiteSetting'
               type: object
         "400":
-          description: Bad Request
+          description: 標題為空，或社群連結網址格式不正確
           schema:
             $ref: '#/definitions/response.Envelope'
         "401":

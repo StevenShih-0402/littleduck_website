@@ -10,11 +10,12 @@ import (
 
 // 業務錯誤碼常數
 const (
-	CodeBadRequest     = "BAD_REQUEST"
-	CodeUnauthorized   = "UNAUTHORIZED"
-	CodeNotFound       = "NOT_FOUND"
-	CodeInternal       = "INTERNAL_ERROR"
-	CodeNotImplemented = "NOT_IMPLEMENTED"
+	CodeBadRequest      = "BAD_REQUEST"
+	CodeUnauthorized    = "UNAUTHORIZED"
+	CodeNotFound        = "NOT_FOUND"
+	CodeInternal        = "INTERNAL_ERROR"
+	CodeNotImplemented  = "NOT_IMPLEMENTED"
+	CodeFeatureDisabled = "FEATURE_DISABLED"
 )
 
 // AppError 統一的應用層錯誤，實作 error 介面
@@ -68,6 +69,11 @@ func Internal(err error, message string) *AppError {
 // NotImplemented 建立 501 錯誤
 func NotImplemented(message string) *AppError {
 	return New(CodeNotImplemented, http.StatusNotImplemented, message)
+}
+
+// FeatureDisabled 建立 403 錯誤：功能已被管理員停用
+func FeatureDisabled(message string) *AppError {
+	return New(CodeFeatureDisabled, http.StatusForbidden, message)
 }
 
 // AsAppError 從錯誤鏈中取出 AppError

@@ -4,8 +4,11 @@
 package seed
 
 import (
+	"errors"
 	"strings"
 	"testing"
+
+	"go.uber.org/zap"
 
 	"littleduck-backend/internal/model"
 )
@@ -126,5 +129,49 @@ func TestBuildDonations_MatchesLakeJS(t *testing.T) {
 	}
 	if donations[3].Amt != 200 {
 		t.Errorf("d4 金額應為 200，得到 %d", donations[3].Amt)
+	}
+}
+
+// stubEnsurer 記錄呼叫次數的 FeatureEnsurer
+type stubEnsurer struct {
+	calls int
+	err   error
+}
+
+func (s *stubEnsurer) EnsureDefaults() error { s.calls++; return s.err }
+
+func TestSeedFeatures_CallsEnsureDefaults(t *testing.T) {
+	// Arrange
+	e := &stubEnsurer{}
+
+	// Act
+	err := seedFeatures(e, zap.NewNop())
+
+	// Assert
+	if err != nil {
+		t.Fatalf("seedFeatures 應成功: %v", err)
+	}
+	if e.calls != 1 {
+		t.Errorf("應呼叫 EnsureDefaults 1 次，得到 %d", e.calls)
+	}
+}
+
+func TestSeedFeatures_PropagatesError(t *testing.T) {
+	// Arrange
+	e := &stubEnsurer{err: errors.New("db down")}
+
+	// Act
+	err := seedFeatures(e, zap.NewNop())
+
+	// Assert
+	if err == nil {
+		t.Fatal("EnsureDefaults 失敗應回傳錯誤")
+	}
+}
+
+func TestSeedFeatures_NilEnsurerIsSkipped(t *testing.T) {
+	// Act / Assert
+	if err := seedFeatures(nil, zap.NewNop()); err != nil {
+		t.Fatalf("未提供 ensurer 應略過: %v", err)
 	}
 }

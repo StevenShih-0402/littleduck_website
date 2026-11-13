@@ -117,7 +117,8 @@ make swag                    # 等同 swag init -g cmd/server/main.go -o docs
 | GET | `/api/v1/articles` | 公開 | 文章列表（僅已發布） |
 | GET | `/api/v1/articles/:id` | 公開 | 讀取單篇文章（不存在回 404） |
 | GET | `/api/v1/comments` | 公開 | 可見留言列表（可用 `?articleId=` 過濾） |
-| POST | `/api/v1/comments` | 公開 | 張貼留言（建立為 pending） |
+| POST | `/api/v1/comments` | 公開（選用權杖） | 張貼留言（建立為 pending）；對應功能開關停用回 403 `FEATURE_DISABLED`。可選帶管理員 `Authorization: Bearer`，有效時略過開關（管理員預覽），無效或過期視同訪客、不回 401 |
+| GET | `/api/v1/features` | 公開 | 功能開關對照表 `{key: boolean}` |
 | GET | `/api/v1/settings` | 公開 | 讀取網站設定 |
 | POST | `/api/v1/stats/pageview` | 公開 | 回報瀏覽事件（非阻塞，回 204） |
 | POST | `/api/v1/payments` | 公開 | 建立付款（骨架，回 501） |
@@ -130,6 +131,23 @@ make swag                    # 等同 swag init -g cmd/server/main.go -o docs
 | PUT | `/api/v1/comments/:id/status` | 🔒 | 變更留言狀態 |
 | PUT | `/api/v1/comments/:id/reply` | 🔒 | 回覆留言 |
 | PUT | `/api/v1/settings` | 🔒 | 更新網站設定 |
+| GET | `/api/v1/admin/features` | 🔒 | 後台功能開關清單（含名稱、說明、狀態） |
+| PUT | `/api/v1/features/:key` | 🔒 | 切換功能開關，body `{"enabled": boolean}`（未知 key 404、缺欄位 400） |
 | GET | `/api/v1/stats` | 🔒 | 最近 30 天每日 views／visitors |
 | GET | `/api/v1/donations` | 🔒 | 贊助紀錄清單（唯讀） |
 | GET | `/swagger/*any` | 公開 | Swagger UI |
+
+### 功能開關
+
+開關登記表在 `internal/service/feature_service.go`（`sponsor`、`guestbook`、`article_comments`），啟動 seed 只補缺的 key、不覆寫既有值。新增功能：在登記表加一列、前端以 `FeatureGate` 包住；有公開寫入端點的功能要在 service 層比照 `comment_service.go` 做後端把關。
+
+### 錯誤碼
+
+| code | HTTP | 說明 |
+|---|---|---|
+| `BAD_REQUEST` | 400 | 請求內容錯誤 |
+| `UNAUTHORIZED` | 401 | 缺少或無效的權杖 |
+| `FEATURE_DISABLED` | 403 | 功能已被管理員停用（目前由 `POST /comments` 回傳） |
+| `NOT_FOUND` | 404 | 資源不存在 |
+| `NOT_IMPLEMENTED` | 501 | 尚未實作 |
+| `INTERNAL_ERROR` | 500 | 伺服器內部錯誤 |

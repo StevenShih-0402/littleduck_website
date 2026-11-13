@@ -15,12 +15,19 @@ import (
 	"littleduck-backend/internal/repository"
 )
 
+// FeatureEnsurer 補齊功能開關預設值（由 service.FeatureService 實作）
+type FeatureEnsurer interface {
+	EnsureDefaults() error
+}
+
 // Repositories seed 所需的各域 repository（以 Count/Exists 判斷資料表是否已有資料）
 type Repositories struct {
 	Article  repository.ArticleRepository
 	Comment  repository.CommentRepository
 	Setting  repository.SettingRepository
 	Donation repository.DonationRepository
+	// Features 功能開關補齊；與其他域不同，每次啟動都執行（只補缺、不覆寫），讓後續新增的 key 能進既有資料庫
+	Features FeatureEnsurer
 }
 
 // Run 對每個為空的資料域寫入種子資料；任一步驟失敗即回傳錯誤
@@ -37,6 +44,18 @@ func Run(db *gorm.DB, repos Repositories, log *zap.Logger) error {
 	if err := seedDonations(db, repos.Donation, log); err != nil {
 		return err
 	}
+	return seedFeatures(repos.Features, log)
+}
+
+// seedFeatures 補齊功能開關；未提供 ensurer 時略過
+func seedFeatures(f FeatureEnsurer, log *zap.Logger) error {
+	if f == nil {
+		return nil
+	}
+	if err := f.EnsureDefaults(); err != nil {
+		return fmt.Errorf("補齊功能開關失敗: %w", err)
+	}
+	log.Info("功能開關補齊完成")
 	return nil
 }
 

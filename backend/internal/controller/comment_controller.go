@@ -6,6 +6,7 @@ package controller
 import (
 	"github.com/gin-gonic/gin"
 
+	"littleduck-backend/internal/middleware"
 	"littleduck-backend/internal/pkg/apperror"
 	"littleduck-backend/internal/pkg/response"
 	"littleduck-backend/internal/service"
@@ -42,13 +43,17 @@ func (ctrl *CommentController) List(c *gin.Context) {
 // Create 訪客張貼留言（預設 pending）
 //
 //	@Summary		張貼留言
-//	@Description	訪客張貼留言，建立為待審核（pending）狀態
+//	@Description	訪客張貼留言，建立為待審核（pending）狀態。對應功能開關（留言板 guestbook／文章留言 article_comments）停用時回 403 FEATURE_DISABLED。
+//	@Description	可選帶管理員 Authorization: Bearer；權杖有效時略過功能開關（管理員預覽），無效或過期的權杖視同訪客、不回 401。
 //	@Tags			comments
 //	@Accept			json
 //	@Produce		json
-//	@Param			body	body		service.CommentInput	true	"留言內容"
-//	@Success		201		{object}	response.Envelope{data=model.Comment}
-//	@Failure		400		{object}	response.Envelope
+//	@Param			Authorization	header		string					false	"選用：Bearer <管理員 JWT>"
+//	@Param			body			body		service.CommentInput	true	"留言內容"
+//	@Success		201				{object}	response.Envelope{data=model.Comment}
+//	@Failure		400				{object}	response.Envelope
+//	@Failure		403				{object}	response.Envelope	"功能已停用（FEATURE_DISABLED）"
+//	@Failure		500				{object}	response.Envelope
 //	@Router			/api/v1/comments [post]
 func (ctrl *CommentController) Create(c *gin.Context) {
 	var in service.CommentInput
@@ -56,7 +61,8 @@ func (ctrl *CommentController) Create(c *gin.Context) {
 		_ = c.Error(apperror.BadRequest("留言內容格式錯誤"))
 		return
 	}
-	comment, err := ctrl.svc.Create(in)
+	_, asAdmin := c.Get(middleware.ContextKeyAdmin)
+	comment, err := ctrl.svc.Create(in, asAdmin)
 	if err != nil {
 		_ = c.Error(err)
 		return
