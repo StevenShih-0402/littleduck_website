@@ -11,10 +11,10 @@
   integrator 檢查、PR 前審查、CI 或 PR 中檢查退回時改回被退回那一端的 backend／frontend（退回 architect 為 proposal）。
   合併隊列失敗不改階段，停下交給 user。 -->
 
-- **階段**：awaiting-approval <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
-- **最後完成**：PR 中檢查
-- **下一步**：風險審批
-- **暫停原因**：高風險，等待 user 回覆合併
+- **階段**：archived <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
+- **最後完成**：integrator 歸檔
+- **下一步**：合併
+- **暫停原因**：無
 - **更新**：主對話 — 2026-11-13
 
 ---
@@ -80,3 +80,10 @@
 - **PR 備註**：3 條（review.md 的 #1 中、#2 低、#3 低）已附進 PR 內文
 - **風險**：命中高風險樣式（資料表結構），需 user 回覆「合併」
 - **收尾 HEAD**：`74faff8251a83f2bb98e244cc1bd2e29052004b5`
+
+## integrator（Teshima）— 歸檔
+
+- 前置條件：PR 中檢查已通過、user 已回覆合併（高風險）。
+- `openspec archive` 同步規格：`comments-api` 修改 1 項、新增主規格 `feature-flags`（6 項需求）；歸檔至 `openspec/changes/archive/2026-11-13-sdp-149-feature-flags/`。
+- `openspec validate --specs`：23/23 通過。
+- 階段改為 archived，下一步合併。
