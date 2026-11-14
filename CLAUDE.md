@@ -122,7 +122,7 @@
 
 | 類別 | 樣式 |
 |------|------|
-| CI／CD 與部署 | `.drone.yml`、`deploy/**`、`**/Dockerfile`、`backend/docker-compose*.yml`、`frontend/vercel.json` |
+| CI／CD 與部署 | `.drone.yml`、`deploy/**`、`**/Dockerfile`、`backend/docker-compose*.yml` |
 | 流程設定 | `.claude/hooks/**`、`.claude/agents/**` |
 | 資料表結構 | `backend/internal/model/**`、`backend/internal/database/**`（GORM AutoMigrate） |
 | 金流 | `backend/internal/service/payment/**`、`backend/internal/controller/payment_controller.go` |

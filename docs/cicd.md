@@ -11,7 +11,7 @@
 | `ci-backend` | PR 開啟／更新（目標 `main`）、推送到 `main` | — |
 | `ci-frontend` | 同上 | — |
 | `cd-backend-staging` | 推送到 `main` | 同一次建置的 `ci-backend` 通過 |
-| `cd-frontend-preview` | 推送到 `main` | 同一次建置的 `ci-frontend` 通過 |
+| `cd-frontend-staging` | 推送到 `main` | 同一次建置的 `ci-frontend` 通過 |
 | `cd-backend-production` | promote 到 `production` | 該 commit 的 push 建置全部通過 |
 | `cd-frontend-production` | promote 到 `production` | 同上 |
 
@@ -44,10 +44,13 @@
 | test-design | `npm run test:design` | 中止 |
 | build | `npm run build` | 中止 |
 | audit | `npm audit --audit-level=high` | 有 high 以上弱點即中止 |
+| docker-build | `docker build -t littleduck-web:ci-<build> frontend` | 中止 |
+| trivy | `trivy image --severity CRITICAL,HIGH --exit-code 1 --ignorefile frontend/.trivyignore` | 有未登記的 CRITICAL／HIGH 即中止 |
+| cleanup | 刪除本次建出的映像 | 不論成敗都執行 |
 
 ### 弱點例外登記
 
-- **Trivy**：登記在 `backend/.trivyignore`，一行一個 CVE。上一行用註解寫明理由、確認日期與預計移除條件。只有在人工確認是誤判或可接受風險後才登記。
+- **Trivy**：後端登記在 `backend/.trivyignore`、前端登記在 `frontend/.trivyignore`，一行一個 CVE。上一行用註解寫明理由、確認日期與預計移除條件。只有在人工確認是誤判或可接受風險後才登記。
 - **npm audit**：沒有例外清單。遇到無法即時升級的弱點，另開 issue 處理，不要降低門檻。
 
 ### 在本機跑 CI
@@ -114,14 +117,39 @@ Hetzner 主機的 80／443 由 mygo_v2_anon 的 Nginx 佔用。本 repo 的站�
 
 ## CD：前端
 
-前端部署在 Vercel，只由 Drone 觸發。`frontend/vercel.json` 已關閉 Vercel 的 Git 自動部署，推送分支不會產生部署。部署腳本是 `deploy/ci/vercel-deploy.sh`。
+前端與後端同一套模型：Drone 建置一個 Next.js standalone 映像，推到 GHCR，部署到 Hetzner 主機；Staging 驗證後，Production 直接部署同一個映像，不重新建置。API 位址不寫進映像，由主機 `.env` 的 `API_BASE_URL` 在執行期經 `/runtime-config.js` 交給瀏覽器，所以同一個映像在 Staging 打 Staging 後端、在 Production 打正式後端。
 
-| pipeline | 流程 | 冒煙測試 |
-|----------|------|----------|
-| `cd-frontend-preview` | `vercel pull --environment=preview` → `vercel build` → `vercel deploy --prebuilt`，記錄中印出 Preview 網址 | 對 Preview 首頁發請求，帶 `x-vercel-protection-bypass` 通過 Vercel Authentication |
-| `cd-frontend-production` | verify-build → `vercel pull --environment=production` → `vercel build --prod` → `vercel deploy --prebuilt --prod` | 對正式網域首頁發請求 |
+### `cd-frontend-staging`（推送到 `main` 時）
 
-回滾：`vercel rollback <前一個部署網址> --token <token>`，或在 Vercel 專案的 Deployments 頁把前一個部署設為 Production（Instant Rollback）。
+| 階段 | 內容 | 失敗時 |
+|------|------|--------|
+| build | 以三個 tag 建置映像（見下方「映像 tag」） | 中止 |
+| trivy | 對要推送的映像再掃一次，門檻同 CI | 中止，不推送 |
+| push-ghcr | 推送三個 tag 到 GHCR，結束後 `docker logout` | 中止 |
+| bundle | 組部署包：`deploy/web/docker-compose.staging.yml`、渲染好的 Nginx 站台、主機端腳本、`image.txt` | 中止 |
+| upload | `scp` 部署包到 `/opt/littleduck-web-staging` | 中止 |
+| deploy | 主機上執行 `remote-deploy.sh … web`：`pull` → `up -d` → 120 秒內等 web 變成 healthy → 更新 Nginx 站台 | 逾時即失敗，印出 `docker compose ps` 與 web 記錄 |
+| smoke | `smoke-frontend.sh`：`/`、`/blog` 回 2xx，且 `/runtime-config.js` 含 Staging 後端位址 | 任一不符即失敗 |
+| cleanup | 刪除 runner 主機上本次建出的映像 | 不論成敗都執行 |
+
+### `cd-frontend-production`（promote 到 `production` 時）
+
+| 階段 | 內容 | 失敗時 |
+|------|------|--------|
+| verify-build | 查該 commit 的 `continuous-integration/drone/push` 狀態，必須是 `success` | 中止，不部署 |
+| bundle／upload／deploy | 同 Staging，目錄為 `/opt/littleduck-web`，映像是同一個 `<version>-<sha>` | 同上 |
+| smoke | 對正式網域做同樣檢查，`/runtime-config.js` 須含正式後端位址 | 任一不符即失敗，需依 runbook 回滾 |
+
+### 映像與站台
+
+- 映像位置：`ghcr.io/stevenshih-0402/littleduck-web`；tag 規則同後端（`<version>-<git 短 sha>`、`<version>`、`latest`），`<version>` 取自 `frontend/package.json` 的 `version`。
+- 部署腳本在 `deploy/ci/`：`image-ref.sh frontend`、`frontend-version.sh`、`frontend-bundle.sh`、`smoke-frontend.sh`；主機端沿用 `remote-deploy.sh`（第 4 個參數指定服務 `web`）。
+- compose 檔在 `deploy/web/`（容器 `littleduck-web`、`littleduck-web-staging`，不開埠，只接 `mygo-edge`）。
+- Nginx 站台樣板是 `deploy/edge/web.conf.template`、`web-staging.conf.template`，機制同上方「Nginx 站台」。
+
+### 回滾
+
+與後端相同：在主機上把部署目錄的 `image.txt` 換成前一個 `<version>-<sha>` 後重新 `docker compose up -d`，或在 Drone 對前一個良好建置重新 promote。步驟見 runbook。
 
 ## Secret 清單
 
@@ -133,6 +161,4 @@ Hetzner 主機的 80／443 由 mygo_v2_anon 的 Nginx 佔用。本 repo 的站�
 | `hetzner_host` | Hetzner 主機 IP |
 | `deploy_ssh_key` | `deploy` 帳號的 `drone-deploy` 私鑰 |
 | `api_host`、`api_staging_host` | 後端 Production／Staging 網域 |
-| `vercel_token`、`vercel_org_id`、`vercel_project_id` | Vercel CLI |
-| `vercel_bypass_secret` | Preview 冒煙測試用的 Protection Bypass for Automation |
-| `frontend_host` | 前端正式網域 |
+| `frontend_host`、`frontend_staging_host` | 前端 Production／Staging 網域 |
