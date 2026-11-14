@@ -132,31 +132,31 @@ trigger:
 
 steps:
   - name: install
-    image: node:20-alpine
+    image: node:24-alpine
     commands:
       - cd frontend
       - npm ci
 
   - name: lint
-    image: node:20-alpine
+    image: node:24-alpine
     commands:
       - cd frontend
       - npm run lint
 
   - name: typecheck
-    image: node:20-alpine
+    image: node:24-alpine
     commands:
       - cd frontend
       - npm run typecheck
 
   - name: test-design
-    image: node:20-alpine
+    image: node:24-alpine
     commands:
       - cd frontend
       - npm run test:design
 
   - name: build
-    image: node:20-alpine
+    image: node:24-alpine
     environment:
       NEXT_TELEMETRY_DISABLED: "1"
     commands:
@@ -164,7 +164,7 @@ steps:
       - npm run build
 
   - name: audit
-    image: node:20-alpine
+    image: node:24-alpine
     commands:
       - cd frontend
       - npm audit --audit-level=high
