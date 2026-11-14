@@ -11,9 +11,9 @@
   integrator 檢查、PR 前審查、CI 或 PR 中檢查退回時改回被退回那一端的 backend／frontend（退回 architect 為 proposal）。
   合併隊列失敗不改階段，停下交給 user。 -->
 
-- **階段**：reviewing <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
-- **最後完成**：PR 前審查
-- **下一步**：Teshima 收尾
+- **階段**：pr-checking <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
+- **最後完成**：integrator 收尾（開 PR）
+- **下一步**：PR 中檢查
 - **暫停原因**：無
 - **更新**：主對話 — 2026-11-14
 
@@ -86,3 +86,18 @@
 - **規格免同步聲明**：無。
 - **風險**：高風險（`.drone.yml`、`deploy/**`、`**/Dockerfile`）；Trivy 掃描與 compose healthcheck 只能在 CI／部署時驗證；映像建置需連 Google Fonts。
 - **退回**：無
+
+---
+
+## integrator（Teshima）— 收尾
+
+- **重切前 SHA（OLD）**：`a23d528feb3326e4bfcddd95e769f00fef70f0ce`
+- **重切起點（FROM）**：`c4215fdb7c3b598aa744cfdb2e61c478061b09ec`（merge-base）
+- **重切後 commit**：
+  - `5dcf4a0` feat(ci): 前端改為映像建置並自架部署（含 OpenSpec 變更目錄）
+  - `9379f98` feat(web): 前端容器化並於執行期注入 API 位址
+  - `b9a3243` docs: 改寫前端部署文件並清除 Vercel 殘留
+- **tree 比對**：`git diff OLD HEAD` 為空
+- **PR**：https://github.com/StevenShih-0402/littleduck_website/pull/12（內文附 review.md 3 條 PR 備註，並註明主 repo CLAUDE.md 對後端子目錄的暫時放寬不在本 PR 內）
+- **風險**：高風險（`.drone.yml`、`deploy/**`、`**/Dockerfile`）；Trivy 與 compose healthcheck 待 CI／部署驗證；review.md 3 條中嚴重度備註未處理。
+- **收尾 HEAD**：`b9a32437ca7d7663a5f21dc96f89bb8f8c7c7a8e`
