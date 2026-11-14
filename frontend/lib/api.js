@@ -1,8 +1,14 @@
 // frontend/lib/api.js
 // 後端 API client：fetch 封裝、JWT token 保存與附帶、統一 {code,message,data} envelope 解析、401 自動登出
 
-// base URL 來自環境變數，預設本機後端 8080 埠
-const BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
+import { resolveApiBaseUrl } from "./runtime-config.mjs";
+
+// base URL 每次請求才決定：執行期 /runtime-config.js 注入值 → 建置期 NEXT_PUBLIC_API_BASE_URL → 本機 8080 埠
+function getBaseUrl() {
+  const w = /** @type {Record<string, any>} */ (typeof window !== "undefined" ? window : {});
+  const runtime = w.__LD_RUNTIME_CONFIG__?.apiBaseUrl;
+  return resolveApiBaseUrl(runtime, process.env.NEXT_PUBLIC_API_BASE_URL);
+}
 const API_PREFIX = "/api/v1";
 
 const TOKEN_KEY = "lake_token";
@@ -36,7 +42,7 @@ async function request(method, path, body) {
     init.body = JSON.stringify(body);
   }
 
-  const res = await fetch(BASE_URL + API_PREFIX + path, init);
+  const res = await fetch(getBaseUrl() + API_PREFIX + path, init);
 
   if (res.status === 401) {
     clearToken();

@@ -3,6 +3,7 @@
 
 import "./globals.css";
 import { Crimson_Pro, JetBrains_Mono, Inter, Noto_Serif_TC, Noto_Sans_TC } from "next/font/google";
+import Script from "next/script";
 import { LakeProvider } from "@/store/lake-context";
 
 const crimson = Crimson_Pro({
@@ -44,6 +45,8 @@ export default function RootLayout({ children }) {
   return (
     <html lang="zh-TW" className={fontVars} suppressHydrationWarning>
       <body className="sans">
+        {/* 執行期 API 位址，hydration 前載入 */}
+        <Script src="/runtime-config.js" strategy="beforeInteractive" />
         <LakeProvider>{children}</LakeProvider>
       </body>
     </html>
