@@ -31,7 +31,7 @@ Drone server MUST 以 GitHub OAuth 登入，且只允許設定中列出的 GitHu
 - **THEN** Drone 建立建置，PR 上出現 Drone 的 check，狀態隨建置結束更新為成功或失敗
 
 ### Requirement: 祕密不寫進 repo
-部署用祕密（SSH 私鑰、GHCR token、Vercel token、各環境 env）MUST 存在 Drone 的 repo secret 或主機上的 env 檔，MUST NOT 出現在 repo 或建置記錄的明文中。
+部署用祕密（SSH 私鑰、GHCR token、各環境 env）MUST 存在 Drone 的 repo secret 或主機上的 env 檔，MUST NOT 出現在 repo 或建置記錄的明文中。
 
 #### Scenario: 建置記錄遮蔽祕密
 - **WHEN** 流水線步驟引用 secret 並把它印出
