@@ -12,8 +12,8 @@
   合併隊列失敗不改階段，停下交給 user。 -->
 
 - **階段**：pr-checking <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
-- **最後完成**：integrator 收尾（開 PR）
-- **下一步**：PR 中檢查
+- **最後完成**：PR 中檢查
+- **下一步**：風險審批
 - **暫停原因**：無
 - **更新**：主對話 — 2026-11-14
 
