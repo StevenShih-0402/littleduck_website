@@ -2,7 +2,7 @@
 # deploy/ci/smoke-backend.sh
 # 後端冒煙測試：對關鍵讀取端點各發一次請求，任一非 2xx 即失敗
 
-# 用法：smoke-backend.sh <base URL>，例：smoke-backend.sh https://api-staging.example.com
+# 用法：smoke-backend.sh <base URL>，例：smoke-backend.sh https://api.staging.stevenshih-littleduck.com
 set -eu
 
 base=${1:?用法：smoke-backend.sh <base URL>}

@@ -3,7 +3,7 @@
 # 前端冒煙測試：/、/blog 必須回 2xx，且 /runtime-config.js 內容含預期的 API 位址；任一不符即失敗
 
 # 用法：smoke-frontend.sh <前端 base URL> <預期 API base URL>
-# 例：smoke-frontend.sh https://staging.example.com https://api-staging.example.com
+# 例：smoke-frontend.sh https://staging.stevenshih-littleduck.com https://api.staging.stevenshih-littleduck.com
 set -eu
 
 base=${1:?用法：smoke-frontend.sh <前端 base URL> <預期 API base URL>}
