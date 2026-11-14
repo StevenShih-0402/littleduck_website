@@ -7,13 +7,15 @@
 
 流水線的階段與門檻見 [cicd.md](cicd.md)。
 
-> 下文的 `<網域>` 是後端與 Drone 用的正式網域，目前尚未決定（SDP-117 範圍）。子網域固定為 `drone.`、`api.`、`api-staging.`。
-> 前端的主機名已定案，下文直接寫實際值：
+下文直接寫實際主機名，對照如下。`api-staging`、`web-staging` 是環境名稱（目錄、容器、樣板檔名），不是主機名。
 
-| 用途 | 主機名 | Drone secret |
-|------|--------|--------------|
+| 用途 | 主機名 | Drone secret 或設定位置 |
+|------|--------|--------------------------|
 | 前端 Production | `stevenshih-littleduck.com` | `frontend_host` |
 | 前端 Staging | `staging.stevenshih-littleduck.com` | `frontend_staging_host` |
+| Drone | `drone.stevenshih-littleduck.com` | `deploy/drone/.env` 的 `DRONE_SERVER_HOST` |
+| 後端 Production | `api.stevenshih-littleduck.com` | `api_host` |
+| 後端 Staging | `api.staging.stevenshih-littleduck.com` | `api_staging_host` |
 
 ## 0. 前置條件
 
@@ -21,19 +23,19 @@
 |------|------|
 | 主機 | mygo_v2_anon 使用的 Hetzner Cloud CX23。已有 Docker、`deploy` 帳號（只能操作 docker、無 sudo）、外部網路 `mygo-edge` 與 certbot，建置方式見 mygo_v2_anon 的 `docs/deployment-runbook.md` 第 2 節 |
 | mygo 的 Nginx 要能載入外部站台 | mygo_v2_anon 的 Nginx 必須把主機 `/opt/edge-sites` 掛到容器 `/etc/nginx/edge-sites`，並在 http 區塊 `include /etc/nginx/edge-sites/*.conf;`。**這是 mygo_v2_anon 的變更（SDP-114）**，完成前 littleduck 的 api、web 與 Drone 都無法對外 |
-| DNS | `drone.<網域>`、`api.<網域>`、`api-staging.<網域>` 的 A 記錄指向主機 IP；前端的 DNS 見第 3 節 |
+| DNS | `drone.stevenshih-littleduck.com`、`api.stevenshih-littleduck.com`、`api.staging.stevenshih-littleduck.com` 三筆 A 記錄指向主機 IP，Cloudflare 代理狀態設為 DNS only（灰雲），HTTP-01 驗證與憑證續約需要直連；前端的兩筆 DNS 見第 3 節（同樣 DNS only） |
 
 ## 1. Drone 初次建置
 
 1. **建立 GitHub OAuth App**：在 GitHub 的 Settings → Developer settings → OAuth Apps 建立。
-   - Homepage URL：`https://drone.<網域>`
-   - Authorization callback URL：`https://drone.<網域>/login`
+   - Homepage URL：`https://drone.stevenshih-littleduck.com`
+   - Authorization callback URL：`https://drone.stevenshih-littleduck.com/login`
    - 記下 Client ID，並產生一組 Client Secret。
 2. **核發憑證**：在主機上以 root 執行，webroot 與 mygo 共用。
    ```bash
-   certbot certonly --webroot -w /var/www/certbot -d drone.<網域>
+   certbot certonly --webroot -w /var/www/certbot -d drone.stevenshih-littleduck.com
    ```
-   第一次核發前，Nginx 要先能回應 `drone.<網域>` 的 HTTP-01 驗證。若尚未放站台設定，可先用 `certbot --standalone`，但要短暫停掉佔用 80 埠的 Nginx。
+   第一次核發前，Nginx 要先能回應 `drone.stevenshih-littleduck.com` 的 HTTP-01 驗證。若尚未放站台設定，可先用 `certbot --standalone`，但要短暫停掉佔用 80 埠的 Nginx。
 3. **放設定並啟動**：
    ```bash
    sudo mkdir -p /opt/drone /opt/edge-sites && sudo chown deploy: /opt/drone /opt/edge-sites
@@ -44,16 +46,16 @@
    ```
 4. **放 Nginx 站台**：在本機渲染後上傳，再到主機上安裝。
    ```bash
-   DRONE_HOST=drone.<網域> deploy/edge/render.sh /tmp/sites drone
+   DRONE_HOST=drone.stevenshih-littleduck.com deploy/edge/render.sh /tmp/sites drone
    scp /tmp/sites/littleduck-drone.conf deploy/edge/install-sites.sh deploy@<主機>:/tmp/
    ssh deploy@<主機> 'sh /tmp/install-sites.sh /tmp'
    ```
-5. **啟用 repo**：用 `DRONE_USER_FILTER` 列出的帳號登入 `https://drone.<網域>`，啟用 `littleduck_website`，然後在 repo 設定中：
+5. **啟用 repo**：用 `DRONE_USER_FILTER` 列出的帳號登入 `https://drone.stevenshih-littleduck.com`，啟用 `littleduck_website`，然後在 repo 設定中：
    - 勾選 **Trusted**。CI 要掛載主機的 docker.sock 與快取目錄，只有管理員能設定。
    - 用 drone CLI 執行 `drone repo update --ignore-forks StevenShih-0402/littleduck_website`。repo 是 public，fork 來的 PR 不應在掛著 docker.sock 的 runner 上執行。
    - 依 [cicd.md](cicd.md#secret-清單) 建立 secret，全部不勾 Allow Pull Requests。
 6. **驗證**：
-   - 瀏覽器開 `https://drone.<網域>` 看到登入頁。
+   - 瀏覽器開 `https://drone.stevenshih-littleduck.com` 看到登入頁。
    - 用不在 `DRONE_USER_FILTER` 的帳號登入會被拒絕。
    - 從外部連主機任何埠都連不到 Drone 容器，因為 compose 檔沒有開埠。
 
@@ -67,8 +69,8 @@
 
 | 環境 | 目錄 | 容器 | 網域 |
 |------|------|------|------|
-| Staging | `/opt/littleduck-api-staging` | `littleduck-api-staging`、`littleduck-db-staging` | `api-staging.<網域>` |
-| Production | `/opt/littleduck-api` | `littleduck-api`、`littleduck-db` | `api.<網域>` |
+| Staging | `/opt/littleduck-api-staging` | `littleduck-api-staging`、`littleduck-db-staging` | `api.staging.stevenshih-littleduck.com` |
+| Production | `/opt/littleduck-api` | `littleduck-api`、`littleduck-db` | `api.stevenshih-littleduck.com` |
 
 1. **建目錄與 `.env`**：
    ```bash
@@ -85,7 +87,12 @@
    ```
    把 `drone_deploy.pub` 加到主機 `/home/deploy/.ssh/authorized_keys`，私鑰內容存成 Drone secret `deploy_ssh_key`。
 3. **GHCR 讀取權限**：主機的 `docker compose pull` 要能讀 GHCR。mygo 已用 `deploy` 帳號執行過 `docker login ghcr.io`，同一個 GitHub 帳號的 package 可以共用。若 package 是 private，確認那把 PAT 有 `read:packages`。
-4. **憑證**：分別對 `api.<網域>`、`api-staging.<網域>` 執行 `certbot certonly --webroot -w /var/www/certbot -d <網域>`。**要在第一次 CD 之前完成**，否則 `install-sites.sh` 會因找不到憑證而讓部署失敗。站台不會被放上去，所以 mygo 不受影響。
+4. **憑證**：兩個主機名各一張：
+   ```bash
+   sudo certbot certonly --webroot -w /var/www/certbot -d api.stevenshih-littleduck.com
+   sudo certbot certonly --webroot -w /var/www/certbot -d api.staging.stevenshih-littleduck.com
+   ```
+   **要在第一次 CD 之前完成**，否則 `install-sites.sh` 會因找不到憑證而讓部署失敗。站台不會被放上去，所以 mygo 不受影響。
 5. **第一次部署**：合併任一 PR 到 `main`，`cd-backend-staging` 會建立 Staging。Production 等第一次 promote。
 
 ## 3. 前端主機初次建置
@@ -125,8 +132,8 @@
    sudo mkdir -p /opt/littleduck-web /opt/littleduck-web-staging && sudo chown deploy: /opt/littleduck-web*
    ```
    兩個目錄各放一份 `.env`，**只有一行**：
-   - Staging：`API_BASE_URL=https://api-staging.<網域>`
-   - Production：`API_BASE_URL=https://api.<網域>`
+   - Staging：`API_BASE_URL=https://api.staging.stevenshih-littleduck.com`
+   - Production：`API_BASE_URL=https://api.stevenshih-littleduck.com`
 
    這個值在容器啟動時由 `/runtime-config.js` 交給瀏覽器，改了 `.env` 後 `docker compose up -d` 重建容器即可，不必重建映像。
 6. **建 Drone secret**：新增 `frontend_staging_host`（`staging.stevenshih-littleduck.com`），`frontend_host` 改成 `stevenshih-littleduck.com`；不勾 Allow Pull Requests。`deploy_ssh_key`、`hetzner_host`、`ghcr_*` 與後端共用。
@@ -142,7 +149,7 @@
 1. **PR 合併到 `main`**：Drone 自動跑 CI，接著跑 `cd-backend-staging` 與 `cd-frontend-staging`。
 2. **檢查 Staging**：
    - 到 Drone 的建置頁確認整個建置是綠的。
-   - 後端打 `https://api-staging.<網域>/health`。
+   - 後端打 `https://api.staging.stevenshih-littleduck.com/health`。
    - 前端開 `https://staging.stevenshih-littleduck.com`，並確認 `https://staging.stevenshih-littleduck.com/runtime-config.js` 的 `apiBaseUrl` 是 Staging 後端；`cd-frontend-staging` 的 smoke 階段已自動檢查。
 3. **promote**：在 Drone 建置頁右上角按 Deploy，Target 填 `production`。也可以用 CLI：
    ```bash
@@ -166,7 +173,7 @@ docker image ls ghcr.io/stevenshih-0402/littleduck-api   # 或到 GitHub → Pac
 echo ghcr.io/stevenshih-0402/littleduck-api:<前一版>-<sha> > image.txt
 LITTLEDUCK_API_IMAGE=$(cat image.txt) docker compose -f docker-compose.prod.yml up -d
 docker inspect -f '{{.State.Health.Status}}' littleduck-api   # 等到 healthy
-curl -fsS https://api.<網域>/health
+curl -fsS https://api.stevenshih-littleduck.com/health
 ```
 
 也可以在 Drone 對前一個良好的建置重新 promote 到 `production`，效果相同，而且會跑冒煙測試。
