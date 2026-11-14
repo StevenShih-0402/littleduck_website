@@ -1,0 +1,6 @@
+openapi: 3.0.3
+info:
+  title: littleduck_website API — sdp-117-cicd-rollout
+  version: 0.0.0
+  description: 本次無 API 變動。SDP-117 只把正式網域落實到部署文件、部署腳本註解與規格，不新增或修改任何端點。
+paths: {}

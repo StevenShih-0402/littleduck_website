@@ -81,7 +81,7 @@ docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:$PWD" -w "
 | bundle | 組部署包：compose 檔、渲染好的 Nginx 站台、主機端腳本、`image.txt` | 中止 |
 | upload | `scp` 部署包到 `/opt/littleduck-api-staging` | 中止 |
 | deploy | 主機上執行 `remote-deploy.sh`：`pull` → `up -d` → 120 秒內等 api 變成 healthy → 更新 Nginx 站台 | 逾時即失敗，印出 `docker compose ps` 與 api 記錄 |
-| smoke | 對 `https://<staging>/health`、`/api/v1/articles` 各發一次請求 | 任一非 2xx 即失敗 |
+| smoke | 對 `https://api.staging.stevenshih-littleduck.com/health`、`/api/v1/articles` 各發一次請求（主機名來自 secret `api_staging_host`） | 任一非 2xx 即失敗 |
 | cleanup | 刪除 runner 主機上本次建出的映像 | 不論成敗都執行 |
 
 ### `cd-backend-production`（promote 到 `production` 時）
@@ -90,7 +90,7 @@ docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:$PWD" -w "
 |------|------|--------|
 | verify-build | 查該 commit 的 `continuous-integration/drone/push` 狀態，必須是 `success` | 中止，不部署 |
 | bundle／upload／deploy | 同 Staging，目錄為 `/opt/littleduck-api`，映像是同一個 `<version>-<sha>` | 同上 |
-| smoke | 對 `https://<production>/health`、`/api/v1/articles` | 任一非 2xx 即失敗，需依 runbook 回滾 |
+| smoke | 對 `https://api.stevenshih-littleduck.com/health`、`/api/v1/articles`（主機名來自 secret `api_host`） | 任一非 2xx 即失敗，需依 runbook 回滾 |
 
 Production 不重新建置映像，直接部署 Staging 驗證過的那個 tag。
 
@@ -155,10 +155,25 @@ Hetzner 主機的 80／443 由 mygo_v2_anon 的 Nginx 佔用。本 repo 的站�
 
 在 Drone 的 repo 設定 → Secrets 建立。全部**不要勾** Allow Pull Requests，這樣 PR 建置拿不到。
 
-| secret | 用途 |
-|--------|------|
-| `ghcr_username`、`ghcr_token` | 推送 GHCR（PAT 需 `write:packages`） |
-| `hetzner_host` | Hetzner 主機 IP |
-| `deploy_ssh_key` | `deploy` 帳號的 `drone-deploy` 私鑰 |
-| `api_host`、`api_staging_host` | 後端 Production／Staging 網域 |
-| `frontend_host`、`frontend_staging_host` | 前端 Production／Staging 網域 |
+| secret | 用途 | 值 |
+|--------|------|----|
+| `ghcr_username`、`ghcr_token` | 推送 GHCR（PAT 需 `write:packages`） | GitHub 帳號與具 `write:packages` 的 PAT |
+| `hetzner_host` | Hetzner 主機 IP | 主機 IP，不寫進 repo |
+| `deploy_ssh_key` | `deploy` 帳號的 `drone-deploy` 私鑰 | runbook 第 2 節產生的私鑰內容 |
+| `api_host` | 後端 Production 網域 | `api.stevenshih-littleduck.com` |
+| `api_staging_host` | 後端 Staging 網域 | `api.staging.stevenshih-littleduck.com` |
+| `frontend_host` | 前端 Production 網域 | `stevenshih-littleduck.com` |
+| `frontend_staging_host` | 前端 Staging 網域 | `staging.stevenshih-littleduck.com` |
+
+## 各階段耗時
+
+由 user 實機量測後填寫（對應 SDP-113 tasks 6.1）；耗時與日期在量測前維持「待量測」。
+
+| 階段 | 起點→終點 | 耗時 | 量測日期 |
+|------|-----------|------|----------|
+| PR CI | PR 開啟 → `continuous-integration/drone/pr` 成功 | 待量測 | 待量測 |
+| 後端 Staging | 合併 → `cd-backend-staging` 完成 | 待量測 | 待量測 |
+| 前端 Staging | 合併 → `cd-frontend-staging` 完成 | 待量測 | 待量測 |
+| 後端 Production | promote → `cd-backend-production` 完成 | 待量測 | 待量測 |
+| 前端 Production | promote → `cd-frontend-production` 完成 | 待量測 | 待量測 |
+| 全程 | PR 開啟 → Production 冒煙通過 | 待量測 | 待量測 |
