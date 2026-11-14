@@ -51,7 +51,7 @@ docker compose up --build    # api + PostgreSQL 16
 
 ### CI/CD
 
-以自架的 Drone 跑 CI（PR 與 `main` 推送時檢查前後端）與 CD（後端部署到 Hetzner、前端部署到 Vercel；先上 Staging／Preview，在 Drone promote 後才上 Production），設定在 `.drone.yml`。
+以自架的 Drone 跑 CI（PR 與 `main` 推送時檢查前後端）與 CD（後端與前端都以映像部署到 Hetzner；先上 Staging，在 Drone promote 後才上 Production），設定在 `.drone.yml`。
 
 - 流水線階段、門檻與本機執行 CI 的方式：[docs/cicd.md](docs/cicd.md)
 - 初次建置、日常發布與回滾：[docs/deployment-runbook.md](docs/deployment-runbook.md)

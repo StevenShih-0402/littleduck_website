@@ -2,7 +2,7 @@
 # deploy/edge/render.sh
 # 把本目錄的 *.conf.template 渲染成 Nginx 站台設定：只帶入站台網域變數，保留 $host 等 Nginx 變數
 
-# 用法：DRONE_HOST=… API_HOST=… API_STAGING_HOST=… deploy/edge/render.sh <輸出目錄> [樣板名…]
+# 用法：DRONE_HOST=… API_HOST=… API_STAGING_HOST=… FRONTEND_HOST=… FRONTEND_STAGING_HOST=… deploy/edge/render.sh <輸出目錄> [樣板名…]
 # 未指定樣板名時渲染全部；樣板用到的網域變數未設定就失敗，避免產出空的 server_name。
 set -eu
 

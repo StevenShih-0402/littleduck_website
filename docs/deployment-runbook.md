@@ -2,20 +2,26 @@
 
 給日常開發者的部署手冊，分成兩部分：
 
-- 第 1–4 節：初次建置。Drone、後端主機、Vercel 的一次性設定，換主機或重建時才需要重做。
+- 第 1–4 節：初次建置。Drone、後端主機、前端主機的一次性設定，換主機或重建時才需要重做。
 - 第 5–6 節：日常發布與回滾。
 
 流水線的階段與門檻見 [cicd.md](cicd.md)。
 
-> 下文的 `<網域>` 是正式網域，目前尚未決定。子網域固定為 `drone.`、`api.`、`api-staging.`。
+> 下文的 `<網域>` 是後端與 Drone 用的正式網域，目前尚未決定（SDP-117 範圍）。子網域固定為 `drone.`、`api.`、`api-staging.`。
+> 前端的主機名已定案，下文直接寫實際值：
+
+| 用途 | 主機名 | Drone secret |
+|------|--------|--------------|
+| 前端 Production | `stevenshih-littleduck.com` | `frontend_host` |
+| 前端 Staging | `staging.stevenshih-littleduck.com` | `frontend_staging_host` |
 
 ## 0. 前置條件
 
 | 項目 | 說明 |
 |------|------|
 | 主機 | mygo_v2_anon 使用的 Hetzner Cloud CX23。已有 Docker、`deploy` 帳號（只能操作 docker、無 sudo）、外部網路 `mygo-edge` 與 certbot，建置方式見 mygo_v2_anon 的 `docs/deployment-runbook.md` 第 2 節 |
-| mygo 的 Nginx 要能載入外部站台 | mygo_v2_anon 的 Nginx 必須把主機 `/opt/edge-sites` 掛到容器 `/etc/nginx/edge-sites`，並在 http 區塊 `include /etc/nginx/edge-sites/*.conf;`。**這是 mygo_v2_anon 的變更（SDP-114）**，完成前 littleduck 的 api 與 Drone 都無法對外 |
-| DNS | `drone.<網域>`、`api.<網域>`、`api-staging.<網域>` 的 A 記錄指向主機 IP |
+| mygo 的 Nginx 要能載入外部站台 | mygo_v2_anon 的 Nginx 必須把主機 `/opt/edge-sites` 掛到容器 `/etc/nginx/edge-sites`，並在 http 區塊 `include /etc/nginx/edge-sites/*.conf;`。**這是 mygo_v2_anon 的變更（SDP-114）**，完成前 littleduck 的 api、web 與 Drone 都無法對外 |
+| DNS | `drone.<網域>`、`api.<網域>`、`api-staging.<網域>` 的 A 記錄指向主機 IP；前端的 DNS 見第 3 節 |
 
 ## 1. Drone 初次建置
 
@@ -82,30 +88,62 @@
 4. **憑證**：分別對 `api.<網域>`、`api-staging.<網域>` 執行 `certbot certonly --webroot -w /var/www/certbot -d <網域>`。**要在第一次 CD 之前完成**，否則 `install-sites.sh` 會因找不到憑證而讓部署失敗。站台不會被放上去，所以 mygo 不受影響。
 5. **第一次部署**：合併任一 PR 到 `main`，`cd-backend-staging` 會建立 Staging。Production 等第一次 promote。
 
-## 3. Vercel 初次建置
+## 3. 前端主機初次建置
 
-1. **建立專案**：在 Vercel 建立專案並連到本 repo。
-   - Root Directory 設為 `frontend`。
-   - Framework Preset 為 Next.js。
-   - Node.js 版本選 20.x 以上（Next 16 需要 ≥ 20.9）。
-2. **關閉 Git 自動部署**：`frontend/vercel.json` 已設 `git.deploymentEnabled: false`。推一個非 `main` 分支後，在 Deployments 頁確認沒有新部署。
-3. **Token 與 ID**：
-   - 在 Account Settings → Tokens 建立 token，存成 Drone secret `vercel_token`。
-   - 在本機 **repo 根目錄**執行 `vercel link`，從產生的 `.vercel/project.json` 取 `orgId`、`projectId`，存成 `vercel_org_id`、`vercel_project_id`。專案的 Root Directory 已是 `frontend`，CLI 要從 repo 根目錄執行；CD 腳本也是在根目錄執行。`.vercel/` 已列入 `.gitignore`。
-4. **Preview 冒煙用的 bypass**：在 Project Settings → Deployment Protection 建立 Protection Bypass for Automation，存成 `vercel_bypass_secret`。
-5. **正式網域**：在 Project Settings → Domains 綁定網域，同一個值存成 `frontend_host`。
+前端與後端一樣部署在這台主機，每個環境一個目錄：
+
+| 環境 | 目錄 | 容器 | 主機名 |
+|------|------|------|--------|
+| Staging | `/opt/littleduck-web-staging` | `littleduck-web-staging` | `staging.stevenshih-littleduck.com` |
+| Production | `/opt/littleduck-web` | `littleduck-web` | `stevenshih-littleduck.com` |
+
+1. **量測記憶體**：CX23 只有 4 GB，前端兩個容器的上限合計 448M（Staging 192M、Production 256M），`ci-frontend` 與 `cd-frontend-staging` 的 `next build`／`docker build` 也在這台 runner 上跑。
+   ```bash
+   free -m
+   docker stats --no-stream
+   ```
+   判準：`available` 減去 448M 後仍 >= 1024M（保留給建置尖峰）。不足時先調低 `deploy/web/docker-compose.staging.yml` 的記憶體上限與 `NODE_OPTIONS`，或加 swap，再往下做。量測結果記在這裡：
+
+   | 日期 | total | used | available | `docker stats` 合計 | 判定 |
+   |------|-------|------|-----------|---------------------|------|
+   | （user 填） | | | | | |
+
+2. **DNS**：`stevenshih-littleduck.com`（apex）與 `staging.stevenshih-littleduck.com` 都改成 **A 記錄**指向主機 IP；原本指向舊託管服務（切換前前端所在的平台）的記錄與轉址規則一併移除。Cloudflare 的代理狀態設為 **DNS only**（灰雲），否則 HTTP-01 驗證與後續憑證續約會失敗。
+3. **清理 mygo 舊的 `staging.` 記錄**：`staging.stevenshih-littleduck.com` 是 mygo 舊 Staging 的主機名。先確認 mygo 已不使用，再移除舊的 A 記錄與 certbot 續約設定：
+   ```bash
+   sudo certbot certificates                                    # 找出舊憑證
+   sudo certbot delete --cert-name staging.stevenshih-littleduck.com
+   ```
+   並確認 mygo 的 Nginx 設定沒有引用該主機名。
+4. **核發憑證**：兩個主機名各一張，**要在第一次 CD 之前完成**，否則 `install-sites.sh` 找不到憑證會讓部署失敗（站台不會被放上去，mygo 不受影響）。
+   ```bash
+   sudo certbot certonly --webroot -w /var/www/certbot -d stevenshih-littleduck.com
+   sudo certbot certonly --webroot -w /var/www/certbot -d staging.stevenshih-littleduck.com
+   ```
+5. **建目錄與 `.env`**：
+   ```bash
+   sudo mkdir -p /opt/littleduck-web /opt/littleduck-web-staging && sudo chown deploy: /opt/littleduck-web*
+   ```
+   兩個目錄各放一份 `.env`，**只有一行**：
+   - Staging：`API_BASE_URL=https://api-staging.<網域>`
+   - Production：`API_BASE_URL=https://api.<網域>`
+
+   這個值在容器啟動時由 `/runtime-config.js` 交給瀏覽器，改了 `.env` 後 `docker compose up -d` 重建容器即可，不必重建映像。
+6. **建 Drone secret**：新增 `frontend_staging_host`（`staging.stevenshih-littleduck.com`），`frontend_host` 改成 `stevenshih-littleduck.com`；不勾 Allow Pull Requests。`deploy_ssh_key`、`hetzner_host`、`ghcr_*` 與後端共用。
+7. **第一次部署**：合併 PR 到 `main` 後 `cd-frontend-staging` 會建立 Staging，用 `smoke` 階段確認 `/runtime-config.js` 含 Staging 後端位址。Production 等第一次 promote。
+8. **移除舊託管服務**：Production promote 成功、確認新站正常後，才刪除舊託管服務上的前端專案，並刪除 Drone 裡殘留的四個舊 secret（token、org id、project id、preview bypass，名稱都以該服務的名字開頭）。在那之前保留舊專案，作為整體回退的後路（把 DNS 指回去）。
 
 ## 4. 確認 CI 會回報到 PR
 
-開一個只改文件的 PR，然後執行 `gh pr checks <PR>`。應該看到 `continuous-integration/drone/pr` 且狀態為成功；GHCR 與 Vercel 都不應出現新的映像或部署。
+開一個只改文件的 PR，然後執行 `gh pr checks <PR>`。應該看到 `continuous-integration/drone/pr` 且狀態為成功；GHCR 不應出現新的映像。
 
 ## 5. 日常發布
 
-1. **PR 合併到 `main`**：Drone 自動跑 CI，接著跑 `cd-backend-staging` 與 `cd-frontend-preview`。
+1. **PR 合併到 `main`**：Drone 自動跑 CI，接著跑 `cd-backend-staging` 與 `cd-frontend-staging`。
 2. **檢查 Staging**：
    - 到 Drone 的建置頁確認整個建置是綠的。
    - 後端打 `https://api-staging.<網域>/health`。
-   - 前端打記錄中印出的 Preview 網址。
+   - 前端開 `https://staging.stevenshih-littleduck.com`，並確認 `https://staging.stevenshih-littleduck.com/runtime-config.js` 的 `apiBaseUrl` 是 Staging 後端；`cd-frontend-staging` 的 smoke 階段已自動檢查。
 3. **promote**：在 Drone 建置頁右上角按 Deploy，Target 填 `production`。也可以用 CLI：
    ```bash
    drone build promote StevenShih-0402/littleduck_website <build 編號> production
@@ -137,8 +175,16 @@ curl -fsS https://api.<網域>/health
 
 ### 前端
 
+與後端相同，改用前一個不可變 tag（Staging 目錄為 `/opt/littleduck-web-staging`、檔案 `docker-compose.staging.yml`、容器 `littleduck-web-staging`）：
+
 ```bash
-vercel rollback <前一個部署網址> --token <token>
+ssh deploy@<主機>
+cd /opt/littleduck-web
+docker image ls ghcr.io/stevenshih-0402/littleduck-web   # 或到 GitHub → Packages 查歷史 tag
+echo ghcr.io/stevenshih-0402/littleduck-web:<前一版>-<sha> > image.txt
+LITTLEDUCK_WEB_IMAGE=$(cat image.txt) docker compose -f docker-compose.prod.yml up -d
+docker inspect -f '{{.State.Health.Status}}' littleduck-web   # 等到 healthy
+curl -fsS https://stevenshih-littleduck.com/runtime-config.js
 ```
 
-也可以在 Vercel 的 Deployments 頁，對前一個部署選 Promote to Production（Instant Rollback）。
+也可以在 Drone 對前一個良好的建置重新 promote 到 `production`，效果相同，而且會跑冒煙測試。前端沒有資料庫，不需評估 schema。

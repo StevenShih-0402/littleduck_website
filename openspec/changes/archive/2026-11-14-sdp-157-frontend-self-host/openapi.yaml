@@ -1,0 +1,9 @@
+openapi: 3.0.3
+info:
+  title: littleduck_website API — sdp-157-frontend-self-host
+  version: 0.1.0
+  description: |
+    本次無 API 變動。
+    前端改自架在 Hetzner；新增的 `/runtime-config.js` 是前端站台（Next.js）自己的路由，
+    回傳 `window.__LD_RUNTIME_CONFIG__={"apiBaseUrl":...};`，不屬於後端 HTTP API，規格寫在 specs/frontend-data-layer。
+paths: {}
