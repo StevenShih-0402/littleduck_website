@@ -11,10 +11,10 @@
   integrator 檢查、PR 前審查、CI 或 PR 中檢查退回時改回被退回那一端的 backend／frontend（退回 architect 為 proposal）。
   合併隊列失敗不改階段，停下交給 user。 -->
 
-- **階段**：awaiting-approval <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
-- **最後完成**：PR 中檢查
-- **下一步**：user 回覆「合併」後歸檔
-- **暫停原因**：高風險，等待 user 回覆合併
+- **階段**：archived <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
+- **最後完成**：integrator 歸檔
+- **下一步**：合併
+- **暫停原因**：（無）
 - **更新**：主對話 — 2026-11-14
 
 ---
@@ -160,3 +160,11 @@
 - **附進 PR 的 review.md 備註**：0 條（目前無 PR 備註）。
 - **風險**：命中 `deploy/**`，高風險，PR 中要等 user 回覆「合併」；design.md 觀察點 2 於歸檔後須重跑確認為空。
 - **收尾 HEAD**：`93f7559f042a8260109c3f1f2bfea4dd0f6fe114`
+
+---
+
+## integrator（Teshima）— 歸檔 2026-11-14
+
+- 歸檔至 `openspec/changes/archive/2026-11-14-sdp-117-cicd-rollout/`，規格已同步（backend-delivery 修改 2 項、ci-server 修改 1 項、frontend-delivery 修改 3 項）；`openspec validate --specs` 23 passed、0 failed。
+- 歸檔後重跑 design.md 執行驗證觀察點第 2 條（`git grep -nE 'api-staging\.(<|example|stevenshih)' -- docs deploy openspec/specs openspec/changes/archive/2026-11-14-sdp-117-cicd-rollout/specs`）：無輸出，通過；觀察點第 3 條 runbook 內新網域計數為 6（需至少 5），通過。
+- 風險：11 項實機驗收未做，SDP-117 由 user 手動維持 In Progress，不轉 Done。
