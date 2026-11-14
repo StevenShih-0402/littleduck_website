@@ -1,0 +1,36 @@
+# deploy/edge/web.conf.template
+# 前端 Production 的 Nginx 站台：CD 以 envsubst 只帶入 ${FRONTEND_HOST} 後放到主機 /opt/edge-sites/，由 mygo 的 Nginx include
+
+server {
+    listen 80;
+    server_name ${FRONTEND_HOST};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    server_name ${FRONTEND_HOST};
+
+    ssl_certificate     /etc/letsencrypt/live/${FRONTEND_HOST}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${FRONTEND_HOST}/privkey.pem;
+
+    # upstream 用 container_name（deploy/web/docker-compose.prod.yml），不可用裸 service 名稱 web，
+    # 否則在 mygo-edge 網路上會與 Staging 的 web 撞名
+    resolver 127.0.0.11 valid=10s;
+    set $web_upstream littleduck-web:3000;
+
+    location / {
+        proxy_pass http://$web_upstream;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

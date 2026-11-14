@@ -1,0 +1,38 @@
+# deploy/web/docker-compose.prod.yml
+# 前端 Production：Next.js standalone 映像，由 Drone CD 同步到 Hetzner 主機的 /opt/littleduck-web 後以 GHCR 映像啟動
+
+# 主機前置（見 docs/deployment-runbook.md「前端主機初次建置」）：
+#   - 同目錄放好 .env（只需 API_BASE_URL=<後端正式主機名的 https 位址>）
+#   - 外部網路 mygo-edge 已存在
+# 啟動時由 CD 帶入 LITTLEDUCK_WEB_IMAGE（GHCR 的 <version>-<sha> 不可變 tag）。
+# container_name 加 littleduck- 前綴：mygo-edge 上以容器名解析，不可與 mygo 或 Staging 重複。不開埠，只由 Nginx 轉送。
+
+name: littleduck-web
+
+services:
+  web:
+    image: ${LITTLEDUCK_WEB_IMAGE:?LITTLEDUCK_WEB_IMAGE 未設定}
+    container_name: littleduck-web
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_OPTIONS: --max-old-space-size=192
+    healthcheck:
+      # 執行映像是 alpine，用 busybox 的 wget；runtime-config.js 由 Next.js 動態產生，能回應代表服務就緒
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/runtime-config.js"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+    networks:
+      - default
+      - mygo-edge
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+networks:
+  mygo-edge:
+    external: true
