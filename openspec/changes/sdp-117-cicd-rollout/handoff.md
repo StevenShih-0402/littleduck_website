@@ -11,9 +11,9 @@
   integrator 檢查、PR 前審查、CI 或 PR 中檢查退回時改回被退回那一端的 backend／frontend（退回 architect 為 proposal）。
   合併隊列失敗不改階段，停下交給 user。 -->
 
-- **階段**：reviewing <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
-- **最後完成**：PR 前審查
-- **下一步**：Teshima 收尾
+- **階段**：pr-checking <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
+- **最後完成**：integrator 收尾（開 PR）
+- **下一步**：PR 中檢查
 - **暫停原因**：無
 - **更新**：主對話 — 2026-11-14
 
@@ -144,3 +144,19 @@
 - **截圖觀察點**：無（略過）。截圖暫存目錄：無。
 - **規格免同步聲明**：無（專案無 spec-sync.yaml，不適用）。
 - **風險**：命中 `deploy/**`，整個變更為高風險，PR 中要等 user 回覆「合併」；觀察點 2 於歸檔後須複查。
+
+---
+
+## integrator（Teshima）— 收尾 2026-11-14
+
+- **重切前 SHA（OLD）**：`7a62695c1aad8ae19b4e77d51fcdb9bc258bb37f`
+- **重切起點（FROM）**：`b059dc9d87552db27e9f4e6fd04556895d74c4cb`（origin/main）
+- **重切後 commit**：
+  - `79e5621` docs(cicd): 部署手冊與流水線文件落實實際主機名並補各階段耗時空表
+  - `d257c14` chore(deploy): Drone 範本預填 DRONE_SERVER_HOST 並更新冒煙腳本註解
+  - `93f7559` docs(openspec): 新增提案、規格 delta 與交接紀錄
+- **tree 比對**：`git diff OLD HEAD` 為空。
+- **PR**：https://github.com/StevenShih-0402/littleduck_website/pull/14（內文引用 `Fixes SDP-117`；user 決定合併後手動改回 In Progress）
+- **附進 PR 的 review.md 備註**：0 條（目前無 PR 備註）。
+- **風險**：命中 `deploy/**`，高風險，PR 中要等 user 回覆「合併」；design.md 觀察點 2 於歸檔後須重跑確認為空。
+- **收尾 HEAD**：`93f7559f042a8260109c3f1f2bfea4dd0f6fe114`
