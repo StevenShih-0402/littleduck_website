@@ -15,6 +15,9 @@ COPY . .
 RUN npm run build
 
 FROM node:20-alpine AS runner
+# 執行期只需要 node：移除映像內建的 npm／npx／corepack／yarn，避免它們自帶的相依（如 undici）被弱點掃描擋下，也縮小攻擊面
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /opt/yarn-* \
+    /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /usr/local/bin/yarn /usr/local/bin/yarnpkg
 WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
