@@ -15,7 +15,7 @@
 - **最後完成**：PR 前審查
 - **下一步**：Teshima 收尾
 - **暫停原因**：無
-- **更新**：主對話 — 2026-11-15
+- **更新**：主對話 — 2026-11-16
 
 ---
 
@@ -66,3 +66,47 @@
 - **規格免同步聲明**：無。
 - **風險**：命中 deploy/**，整體高風險；design.md 觀察點 6 在有殘留已停止容器的機器上字面不為 0（可建議 Hikaru／後續把觀察點改為前後數量相同）；後端子目錄放寬須於合併後改回 backend/；不涵蓋實機 700 權限驗收（user 合併後手動）。
 - **退回**：無。
+
+## integrator（Teshima）— 收尾
+
+- **重切前 SHA（OLD）**：`77f8e8d99022cde3b95f2d79cd3bdd27a5ab7c64`
+- **重切起點（FROM）**：`811afebcada5b9ad4ca35e66a7da081a8de2190b`（merge-base）
+- **重切後 commit**：`8ec9fca` fix(deploy)、`3b973c7` docs、`941b98d` docs(openspec)
+- **tree 比對**：`git diff OLD HEAD` 為空
+- **PR**：https://github.com/StevenShih-0402/littleduck_website/pull/19
+- **PR 備註**：附 2 條（review.md 第 1 輪）
+- **風險**：高風險（deploy/**）；合併後需把主 repo CLAUDE.md 後端子目錄放寬改回 backend/；實機 700 權限驗收由 user 進行。
+- **收尾 HEAD**：`941b98d7d2e9622012689a17c51de0b7b51d5218`
+
+---
+
+## 主對話 — 退回紀錄 — 2026-11-16
+
+- **退回**：退回給後端（Yasumi），第 1 次。高風險審批時 user 回覆「修第 1 條」，要求合併前修正 `review.md` 第 2 輪 #1：`docker exec` 本身失敗（容器不存在、已停止、ID 多行）也回 1，與 `test -f` 不存在相同，會誤報「憑證不存在，請先依 runbook 核發」，spec「無法在容器內執行檢查」Scenario 未達成；測試案例 3 以假 docker 回 126，沒有重現真實失敗。
+- **建議修法**：容器內以專屬結束碼回報不存在（例：`docker exec "$nginx_container" sh -c 'test -f "$1" || exit 3' _ "$cert"`），只有 3 判為不存在，其他非 0 判「無法檢查」；測試案例 3 改為先 `docker stop` 假容器（或其他能產生真實 docker 錯誤的方式）再跑。
+- **範圍**：只修這一條；review.md 其他 PR 備註（第 2 輪 #4、#5，第 1 輪 #2）不在本次要求內。
+
+---
+
+## backend（Yasumi）— 2026-11-16（退回第 1 次修正）
+
+- **做了什麼**：修 review.md 第 2 輪 #1，全數採納。
+  - `deploy/edge/install-sites.sh`：容器內 `sh -c 'test -f "$1" || exit 3' _ "$cert"`，只有 3 判「憑證不存在」（原訊息不變），其他非 0 判「無法檢查」；POSIX sh、set -eu。
+  - `deploy/edge/test-install-sites.sh`：案例 3 改為 PATH 前置 docker 包裝，`ps` 回傳 ID 後真實 `docker stop` 該容器，讓真正的 `docker exec` 失敗（`container ... is not running`，回 1）；案例放最後。案例 1、2 不變。
+  - `design.md` 決策 2、3 同步改為結束碼 3 與停容器做法；spec 無需改。
+- **驗證**：`sh -n` 兩檔通過；shellcheck v0.10.0 `-s sh -S warning` 兩檔無輸出；`sh deploy/edge/test-install-sites.sh` 三案例 PASS、ALL PASS。變異：把分流改回 `rc -eq 1`，案例 2、3 FAIL（案例 3 誤報「不存在」），已還原。
+- **備註**：本機有 5 個舊的已停止 mygo-v2 label 容器（10 天至 2 週前，非本次測試產生），測試只檢查執行中容器所以不受影響，未動。
+- **風險**：仍為高風險（`deploy/**`）；無 backend/ Go 變更；無 schema 變更；openapi.yaml 無異動。
+
+## integrator（Teshima）— 重新檢查通過（退回第 1 次修正後）
+
+- **後端**：`go test ./...` 全 ok；`gofmt -l .` 無輸出；`go vet ./...` 通過（本次無 Go 變更）。
+- **前端**：`npm ci` 成功；`test:design` 32 pass／0 fail；`lint` 0 error（9 既有 warning）；`typecheck`、`build` 通過；`npm audit --audit-level=high` exit 0。
+- **規格**：`openspec validate <change-id> --strict` valid；`openspec validate --specs` 23 passed。
+- **變異測試**：略過（CLAUDE.md 未設定）；Yasumi 手動變異（分流改回 rc -eq 1）案例 2、3 FAIL。
+- **執行驗證（通用）**：本次只改 deploy/、docs/，未啟動 backend／frontend 服務，略過。
+- **執行驗證（本次專屬）**：1 sh -n ok；2 shellcheck v0.10.0 無輸出 rc=0；3 grep 計數 0；4 測試腳本三 PASS＋ALL PASS rc=0（案例 3 現為真實停止容器）；5 「請先依 runbook 核發」計數 1；6 已停止 mygo-v2 容器測試前 5、後 5，無殘留（依先前判定視為通過）。無截圖觀察點。
+- **tasks.md**：全勾選；worktree 乾淨、與 origin 一致；c097340 只動 deploy/edge、design.md、handoff.md，無越界。
+- **規格免同步聲明**：無（無 spec-sync.yaml）。
+- **風險**：高風險（deploy/**）；觀察點 6 字面不為 0（既有 5 個已停止容器）；後端子目錄放寬須於合併後改回 backend/；實機 700 驗收由 user 進行。
+- **退回**：無（本段累計退回仍為主對話退回後端 1 次）。

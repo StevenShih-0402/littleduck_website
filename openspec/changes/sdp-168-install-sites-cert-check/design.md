@@ -32,10 +32,10 @@
 
 ### 2. 區分「憑證不存在」與「無法檢查」
 
-`test -f` 檔案不存在回 1；`docker exec` 自身失敗（容器消失、無法執行指令）回 125／126／127 等非 1 的值。腳本依回傳碼分流：
+`docker exec` 自身失敗（容器消失、已停止、ID 多行）時 Docker CLI 也回 1（另有 125／126／127），與 `test -f` 不存在相同，不能以 1 分流。因此改由容器內以專屬結束碼回報：`docker exec "$c" sh -c 'test -f "$1" || exit 3' _ "$cert"`。腳本依回傳碼分流：
 
-- 回 1 → 原訊息 `<conf>：憑證 <路徑> 不存在，請先依 runbook 核發`，exit 1。
-- 其他非 0 → 新訊息，內容需包含 conf 檔名、憑證路徑與「無法在 Nginx 容器內檢查」字樣，exit 1。
+- 回 3（容器內 `test -f` 失敗）→ 原訊息 `<conf>：憑證 <路徑> 不存在，請先依 runbook 核發`，exit 1。
+- 其他非 0（含 docker 自身失敗的 1、125、126、127）→ 新訊息，內容需包含 conf 檔名、憑證路徑與「無法在 Nginx 容器內檢查」字樣，exit 1。
 - 回 0 → 繼續下一個檔案。
 
 寫法要能在 `set -eu` 下取得回傳碼（例：`if docker exec ...; then ...; else rc=$?; ...`），維持 POSIX `sh`（腳本以 `sh` 呼叫，不可用 bash 語法）。
@@ -50,7 +50,7 @@
 - 映像固定版本（例：`nginx:1.27-alpine`），加上 label `com.docker.compose.project=mygo-v2`、`com.docker.compose.service=nginx`，讓 `install-sites.sh` 原樣找到它。
 - 測試憑證**只建立在容器內**（`docker exec <容器> sh -c 'mkdir -p ... && touch ...'`），主機上沒有同路徑檔案；這樣「憑證存在」案例通過即證明檢查不是在主機上做。
 - 以 `EDGE_SITES_DIR` 指向暫存目錄，不碰 `/opt/edge-sites`。
-- 「無法檢查」案例：在 PATH 最前面放一個 `docker` 包裝腳本，遇到 `exec <id> test ...` 回 126，其餘轉呼叫真正的 docker。
+- 「無法檢查」案例：在 PATH 最前面放一個 `docker` 包裝腳本，`ps` 回傳容器 ID 後立刻 `docker stop` 該容器，讓後續真正的 `docker exec` 因容器未執行而失敗（回 1），其餘轉呼叫真正的 docker；此案例放最後。
 - 開頭若偵測到本機已有同 label 的容器就中止（避免誤操作真正的 mygo Nginx），`trap` 在結束時 `docker rm -f` 測試容器並刪除暫存目錄。
 - 每個案例印 `PASS: <案例>` 或 `FAIL: <案例>：<原因>`；全部通過時最後一行印 `ALL PASS`、exit 0，否則 exit 1。
 
