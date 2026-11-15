@@ -1,0 +1,6 @@
+openapi: 3.0.3
+info:
+  title: littleduck-backend — SDP-169 ci-fail-drill
+  version: 0.0.0
+  description: 本次無 API 變動。SDP-169 只新增一個只在 Drone CI 失敗的演練用 Go 測試。
+paths: {}
