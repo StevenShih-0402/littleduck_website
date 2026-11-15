@@ -63,6 +63,16 @@
 
 **風險**：runner 掛載 docker.sock，等同主機 root 權限。只啟用自己的 repo、開啟 ignore forks、部署 secret 不給 PR，是三道防線。
 
+**排錯**（第一次上線時遇過）：
+
+| 症狀 | 原因 | 處理 |
+|------|------|------|
+| PR 上沒有 Drone check；GitHub repo 的 Settings → Webhooks 顯示 push、pull_request 送出逾時，但 ping、create 成功 | Drone 存的 GitHub OAuth token 失效。`docker logs littleduck-drone-server` 會有 `trigger: cannot find yaml ... error="Bad credentials"` | 在 Drone 登出後重新登入，換一個新 token；再推一個 commit，或在 Webhooks 頁面 Redeliver |
+| 建置一建立就 error，頁面顯示 `linter: untrusted repositories cannot mount host volumes` | repo 沒有設成 Trusted | 在 repo 設定勾選 Trusted 後，到建置頁按 Restart。看不到 Trusted 選項代表帳號不是管理員，要在 `.env` 設 `DRONE_USER_CREATE=username:<帳號>,admin:true` 後重建 server |
+| 建置一建立就 error，頁面顯示 `yaml: missing kind attribute` | `.drone.yml` 有一份沒有 `kind` 的文件，例如開頭註解後多一行 `---` | 每份以 `---` 分隔的文件都要有 `kind: pipeline` |
+
+容器名稱是 `littleduck-drone-server`、`littleduck-drone-runner`，看記錄時用這兩個名稱。
+
 ## 2. 後端主機初次建置
 
 每個環境一個目錄，兩個環境完全獨立：
@@ -85,7 +95,10 @@
    ```bash
    ssh-keygen -t ed25519 -f ~/.ssh/drone_deploy -C "drone-deploy" -N ""
    ```
-   把 `drone_deploy.pub` 加到主機 `/home/deploy/.ssh/authorized_keys`，私鑰內容存成 Drone secret `deploy_ssh_key`。
+   把 `drone_deploy.pub` 加到主機 `/home/deploy/.ssh/authorized_keys`，私鑰內容存成 Drone secret `deploy_ssh_key`。加完後在本機確認能登入，否則 CD 的 upload 階段會以 `ssh: unable to authenticate` 失敗：
+   ```bash
+   ssh -i ~/.ssh/drone_deploy -o IdentitiesOnly=yes deploy@<主機> 'echo ok'
+   ```
 3. **GHCR 讀取權限**：主機的 `docker compose pull` 要能讀 GHCR。mygo 已用 `deploy` 帳號執行過 `docker login ghcr.io`，同一個 GitHub 帳號的 package 可以共用。若 package 是 private，確認那把 PAT 有 `read:packages`。
 4. **憑證**：兩個主機名各一張：
    ```bash
@@ -93,7 +106,13 @@
    sudo certbot certonly --webroot -w /var/www/certbot -d api.staging.stevenshih-littleduck.com
    ```
    **要在第一次 CD 之前完成**，否則 `install-sites.sh` 會因找不到憑證而讓部署失敗。站台不會被放上去，所以 mygo 不受影響。
-5. **第一次部署**：合併任一 PR 到 `main`，`cd-backend-staging` 會建立 Staging。Production 等第一次 promote。
+5. **確認目錄擁有者**：CD 以 `deploy` 身分寫入部署目錄與 `/opt/edge-sites`。目錄若是 root 擁有，upload 階段解壓會 `Permission denied`。第一次 CD 前以 root 確認：
+   ```bash
+   ls -ld /opt/littleduck-* /opt/edge-sites /opt/drone            # 擁有者都要是 deploy
+   chown -R deploy: /opt/littleduck-* /opt/edge-sites /opt/drone   # 不是的話
+   chmod 600 /opt/littleduck-*/.env /opt/drone/.env                # .env 含密碼，只給 deploy 讀
+   ```
+6. **第一次部署**：合併任一 PR 到 `main`，`cd-backend-staging` 會建立 Staging。Production 等第一次 promote。
 
 ## 3. 前端主機初次建置
 
@@ -113,7 +132,11 @@
 
    | 日期 | total | used | available | `docker stats` 合計 | 判定 |
    |------|-------|------|-----------|---------------------|------|
-   | （user 填） | | | | | |
+   | 2026-11-15 | 3819M | 1727M | 2091M | 約 975MiB（15 個容器） | 通過：2091 − 448 = 1643M ≥ 1024M |
+
+   - 量測時 Staging（api、db、web）已在執行，Production 尚未部署，所以數字已包含 `littleduck-web-staging`，結果偏保守。
+   - Production 三個容器的上限合計 1024M（api 256M、db 512M、web 256M）。全部用到上限時，`available` 約剩 1067M，剛好高於 1024M，餘裕不多。量測時 swap 已用 243M。
+   - 磁碟：`/` 共 38G，已用 21G（57%），剩 16G。每次部署都會留下舊映像，要定期 `docker image prune`。
 
 2. **DNS**：`stevenshih-littleduck.com`（apex）與 `staging.stevenshih-littleduck.com` 都改成 **A 記錄**指向主機 IP；原本指向舊託管服務（切換前前端所在的平台）的記錄與轉址規則一併移除。Cloudflare 的代理狀態設為 **DNS only**（灰雲），否則 HTTP-01 驗證與後續憑證續約會失敗。
 3. **清理 mygo 舊的 `staging.` 記錄**：`staging.stevenshih-littleduck.com` 是 mygo 舊 Staging 的主機名。先確認 mygo 已不使用，再移除舊的 A 記錄與 certbot 續約設定：
