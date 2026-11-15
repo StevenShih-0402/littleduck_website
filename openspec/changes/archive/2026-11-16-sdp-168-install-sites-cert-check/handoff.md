@@ -11,11 +11,11 @@
   integrator 檢查、PR 前審查、CI 或 PR 中檢查退回時改回被退回那一端的 backend／frontend（退回 architect 為 proposal）。
   合併隊列失敗不改階段，停下交給 user。 -->
 
-- **階段**：awaiting-approval <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
-- **最後完成**：PR 中檢查
-- **下一步**：等待 user 回覆「合併」後歸檔
-- **暫停原因**：高風險，等待 user 回覆合併
-- **更新**：主對話 — 2026-11-16
+- **階段**：archived <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
+- **最後完成**：integrator 歸檔
+- **下一步**：合併
+- **暫停原因**：無
+- **更新**：integrator — 2026-11-16
 
 ---
 
@@ -123,3 +123,12 @@
 - **PR 備註**：附 3 條（第 1 輪 #2、第 2 輪 #4、#5；第 1 輪 #1 已修正）
 - **風險**：高風險（deploy/**）；合併後需把主 repo CLAUDE.md 後端子目錄放寬改回 backend/；實機 700 權限驗收由 user 進行。
 - **收尾 HEAD**：`a8d5456b7b63eec327965f9efc2f397318d8f9aa`
+
+---
+
+## integrator（Teshima）— 歸檔 2026-11-16
+
+- 歸檔路徑：`openspec/changes/archive/2026-11-16-sdp-168-install-sites-cert-check/`；新 capability `edge-sites` 同步至 `openspec/specs/edge-sites/spec.md`（+2 added）。
+- `openspec validate --specs`：24 passed, 0 failed。
+- 前置：PR 中檢查已通過（review.md 第 4 輪）、user 已回覆合併。
+- 提醒：合併後主 repo `CLAUDE.md` 的「後端子目錄」要改回 `backend/`。
