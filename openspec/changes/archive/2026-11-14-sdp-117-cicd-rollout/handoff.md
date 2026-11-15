@@ -168,3 +168,32 @@
 - 歸檔至 `openspec/changes/archive/2026-11-14-sdp-117-cicd-rollout/`，規格已同步（backend-delivery 修改 2 項、ci-server 修改 1 項、frontend-delivery 修改 3 項）；`openspec validate --specs` 23 passed、0 failed。
 - 歸檔後重跑 design.md 執行驗證觀察點第 2 條（`git grep -nE 'api-staging\.(<|example|stevenshih)' -- docs deploy openspec/specs openspec/changes/archive/2026-11-14-sdp-117-cicd-rollout/specs`）：無輸出，通過；觀察點第 3 條 runbook 內新網域計數為 6（需至少 5），通過。
 - 風險：11 項實機驗收未做，SDP-117 由 user 手動維持 In Progress，不轉 Done。
+
+---
+
+## user 實機驗收（主對話協助記錄）— 2026-11-15
+
+| SDP-113 項次 | 結果 | 依據 |
+|------|------|------|
+| 1.3 | 通過 | 主機 `docker ps`：`littleduck-drone-server`、`littleduck-drone-runner` 皆 Up |
+| 1.4 | **有條件通過** | 登入頁可開、憑證有效；容器只有 `80/tcp, 443/tcp`，沒有對外開埠。「非允許帳號被拒」：user 只有一個 GitHub 帳號，以確認 `DRONE_USER_FILTER` 與 `DRONE_REGISTRATION_CLOSED=true` 的設定代替實測 |
+| 2.4 | 通過 | PR #15 的 `continuous-integration/drone/pr` 成功（Drone 建置 #5），只跑 `ci-*`；PR 期間 GHCR 沒有 `littleduck-*` 套件 |
+| 4.1 | 通過 | 修正 `.drone.yml` 後推送非 main 分支，沒有建立任何建置 |
+| 3.3 | 通過 | `https://api.staging.stevenshih-littleduck.com/health` 回 `{"status":"ok","database":"up"}`，`/api/v1/articles` 回 200 |
+| 4.2 | 通過 | `https://staging.stevenshih-littleduck.com/`、`/blog` 回 200，`/runtime-config.js` 的 `apiBaseUrl` 為 `https://api.staging.stevenshih-littleduck.com` |
+| 3.4 | 通過 | promote 建置 #6 前 Production 沒有站台；promote 後 `https://api.stevenshih-littleduck.com/health` 回 200 |
+| 4.3 | 通過 | promote 後 `https://stevenshih-littleduck.com/`、`/blog` 回 200，`/runtime-config.js` 為 `https://api.stevenshih-littleduck.com` |
+| 3.5 | 未做 | 等 Staging 有第二個版本 |
+| 5.4 | 未做 | |
+| 6.1 | 進行中 | PR CI 約 12:05（backend 6:16 + frontend 5:47，runner capacity 1 依序跑）；promote：`cd-backend-production` 22 秒、`cd-frontend-production` 20 秒 |
+
+其他：runbook 第 3 節第 1 步記憶體量測已填（通過，Production 全滿時餘裕約 1067M）。
+
+### 實機才發現的問題與處理
+
+1. Drone 存的 GitHub OAuth token 失效，hook 處理時 `Bad credentials`，GitHub 端看到逾時：登出後重新登入 Drone。
+2. `.drone.yml` 開頭註解後多一行 `---`，所有建置 `yaml: missing kind attribute`：PR #15 移除。
+3. repo 未設 Trusted，`linter: untrusted repositories cannot mount host volumes`：勾選 Trusted 後 Restart。
+4. `drone-deploy` 公鑰沒有加進主機 `/home/deploy/.ssh/authorized_keys`，upload 階段 `ssh: unable to authenticate`：補上公鑰。
+5. `/opt/drone`、`/opt/littleduck-*`、`/opt/edge-sites` 為 root 擁有，upload 解壓 `Permission denied`：`chown -R deploy:`，`.env` 改 600。
+6. GHCR 第一次建立 `littleduck-web` 時推送 tag 回 `denied`：重跑即成功（偶發）。
