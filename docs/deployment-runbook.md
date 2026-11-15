@@ -173,7 +173,7 @@
       curl -fsS https://stevenshih-littleduck.com/runtime-config.js        # 指向 https://api.stevenshih-littleduck.com
       ```
       再到 Cloudflare DNS 確認沒有其他記錄（例如 `www`）還指向舊服務。有的話，先改指主機或刪掉。
-   2. **解除網域綁定**：在舊服務的專案設定 → Domains，移除 `stevenshih-littleduck.com`、`staging.stevenshih-littleduck.com` 與其他自訂網域。先解除綁定，以免之後別人把同一個網域加到他們的專案時出現衝突。
+   2. **解除網域綁定**：登入**舊服務的 Dashboard**（不是 Cloudflare），進入原本的前端專案 → Settings → Domains，移除 `stevenshih-littleduck.com`、`staging.stevenshih-littleduck.com` 與其他自訂網域。這一步只清掉舊服務那邊的設定。**Cloudflare 的 A 記錄不要動**：它們指向主機，新站靠它們運作。先解除綁定，以免之後別人把同一個網域加到他們的專案時出現衝突。
    3. **刪除專案**：在專案設定最底下的刪除區塊，輸入專案名稱確認刪除。部署紀錄、環境變數與預覽網址會一起刪除，無法復原。
    4. **撤銷 token**：在舊服務的帳號設定 → Tokens，刪除當初給 CD 用的那把 token。只刪 Drone secret 的話，token 本身仍然有效。
    5. **移除 GitHub 整合**：在 GitHub → Settings → Applications → Installed GitHub Apps，找到舊服務的 App，按 Configure。只用在本 repo 的話就 Uninstall；還有其他 repo 在用的話，在 Repository access 把 `littleduck_website` 移除。沒移除的話，它可能繼續在 PR 上留言或建立預覽部署。
