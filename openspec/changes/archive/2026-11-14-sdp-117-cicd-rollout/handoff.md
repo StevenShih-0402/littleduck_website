@@ -183,9 +183,9 @@
 | 4.2 | 通過 | `https://staging.stevenshih-littleduck.com/`、`/blog` 回 200，`/runtime-config.js` 的 `apiBaseUrl` 為 `https://api.staging.stevenshih-littleduck.com` |
 | 3.4 | 通過 | promote 建置 #6 前 Production 沒有站台；promote 後 `https://api.stevenshih-littleduck.com/health` 回 200 |
 | 4.3 | 通過 | promote 後 `https://stevenshih-littleduck.com/`、`/blog` 回 200，`/runtime-config.js` 為 `https://api.stevenshih-littleduck.com` |
-| 3.5 | 未做 | 等 Staging 有第二個版本 |
-| 5.4 | 未做 | |
-| 6.1 | 進行中 | PR CI 約 12:05（backend 6:16 + frontend 5:47，runner capacity 1 依序跑）；promote：`cd-backend-production` 22 秒、`cd-frontend-production` 20 秒 |
+| 3.5 | 通過 | 後端 Staging `0.1.0-a2bb8cf` → `0.1.0-4e5d2e1` → 還原 `0.1.0-a2bb8cf`，兩次都 healthy、`/health` 回 200，db 未重建（記錄在 runbook 第 6 節「演練紀錄」） |
+| 5.4 | 通過 | 以 SDP-169（演練用，已 Canceled）跑 `/ship-issue`：PR #17 的 Drone 建置 #14 在 `ci-backend` go-test 失敗（只有 `internal/pkg/apperror` 的 `TestCIFailureDrill`），第 7.1 步退回後端，該 change 的 `handoff.md` 留有含建置連結的退回紀錄；依計畫中斷、關閉 PR 不合併 |
+| 6.1 | 通過 | 以 PR #16 完整走一次：PR CI 7:16、合併 → Staging 8:15、promote → Production 39 秒，全程 22 分（機器執行約 16 分 10 秒），已填入 `docs/cicd.md`「各階段耗時」 |
 
 其他：runbook 第 3 節第 1 步記憶體量測已填（通過，Production 全滿時餘裕約 1067M）。
 
@@ -197,3 +197,6 @@
 4. `drone-deploy` 公鑰沒有加進主機 `/home/deploy/.ssh/authorized_keys`，upload 階段 `ssh: unable to authenticate`：補上公鑰。
 5. `/opt/drone`、`/opt/littleduck-*`、`/opt/edge-sites` 為 root 擁有，upload 解壓 `Permission denied`：`chown -R deploy:`，`.env` 改 600。
 6. GHCR 第一次建立 `littleduck-web` 時推送 tag 回 `denied`：重跑即成功（偶發）。
+7. runner 與部署主機同一台，CD 的 `cleanup` 會刪掉剛部署的 tag，主機上 `docker image ls` 看不到完整歷史：回滾改以 GHCR 查 tag、由 `docker compose up` 重新拉（runbook 第 6 節已改寫）。
+
+**SDP-113 的 11 項全部驗收完成**（1.4 有條件通過）。
