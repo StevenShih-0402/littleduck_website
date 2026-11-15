@@ -11,9 +11,9 @@
   integrator 檢查、PR 前審查、CI 或 PR 中檢查退回時改回被退回那一端的 backend／frontend（退回 architect 為 proposal）。
   合併隊列失敗不改階段，停下交給 user。 -->
 
-- **階段**：reviewing <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
-- **最後完成**：PR 前審查
-- **下一步**：Teshima 收尾
+- **階段**：pr-checking <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
+- **最後完成**：integrator 收尾（開 PR，高風險審批退回後端第 1 次修正後）
+- **下一步**：PR 中檢查
 - **暫停原因**：無
 - **更新**：主對話 — 2026-11-16
 
@@ -110,3 +110,16 @@
 - **規格免同步聲明**：無（無 spec-sync.yaml）。
 - **風險**：高風險（deploy/**）；觀察點 6 字面不為 0（既有 5 個已停止容器）；後端子目錄放寬須於合併後改回 backend/；實機 700 驗收由 user 進行。
 - **退回**：無（本段累計退回仍為主對話退回後端 1 次）。
+
+---
+
+## integrator（Teshima）— 收尾（高風險審批退回後端第 1 次修正後）
+
+- **重切前 SHA（OLD）**：`bca1a73341f62765b3c686cc5722c69aecd39506`
+- **重切起點（FROM）**：`941b98d7d2e9622012689a17c51de0b7b51d5218`（上次收尾 HEAD）
+- **重切後 commit**：`5071470` fix(deploy)、`a8d5456` docs(openspec)
+- **tree 比對**：`git diff OLD HEAD` 為空
+- **PR**：https://github.com/StevenShih-0402/littleduck_website/pull/19
+- **PR 備註**：附 3 條（第 1 輪 #2、第 2 輪 #4、#5；第 1 輪 #1 已修正）
+- **風險**：高風險（deploy/**）；合併後需把主 repo CLAUDE.md 後端子目錄放寬改回 backend/；實機 700 權限驗收由 user 進行。
+- **收尾 HEAD**：`a8d5456b7b63eec327965f9efc2f397318d8f9aa`
