@@ -60,3 +60,25 @@
 | — | — | — | — | — | — | — | 無新發現。第 2 輪 #1 已修正：容器內 `test -f "$1" \|\| exit 3`，只有 3 判為不存在；案例 3 以真實停止的容器重現 docker exec 失敗，斷言可擋住 `rc -eq 1` 舊寫法 | — |
 
 - **結果**：通過
+
+## 第 4 輪 — PR 中 — 2026-11-16
+
+- **範圍**：941b98d7d2e9622012689a17c51de0b7b51d5218..HEAD（上一輪 PR 中的收尾 HEAD 起）
+- **已審到**：a8d5456b7b63eec327965f9efc2f397318d8f9aa（收尾 HEAD）
+- **審查指令**：
+  - PR 中：CI 全綠（`continuous-integration/drone/pr` build 29）；`/code-review high /home/steven/side_projects/littleduck_website/wt/sdp-168-install-sites-cert-check 941b98d7d2e9622012689a17c51de0b7b51d5218..HEAD`；/security-review 已跑（`claude -p "/security-review"`，無發現）；reviewer 評定模式（已派）
+- **高風險檔案**：`deploy/edge/install-sites.sh`、`deploy/edge/test-install-sites.sh`（`deploy/**`）
+- **風險等級**（只有 PR 中）：高 — 命中高風險檔案樣式 `deploy/**`
+
+| # | 端 | 來源 | 嚴重度 | 信心度 | 檔案:行號 | 對應需求 | 說明 | 處理 |
+|---|----|------|--------|--------|-----------|---------|------|------|
+| 1 | BE | /code-review | — | — | `deploy/edge/install-sites.sh:26`；design.md:27 | design 決策 1 | `docker exec` 以映像預設 USER 執行，未強制 root | 不成立：第 1 輪即有的寫法，本輪未改變非 root 時的行為；design 載明 Nginx 以 root 執行；非 root 時 Nginx 本身也讀不到憑證，擋下是安全方向 |
+| 2 | BE | /code-review | 低 | 高 | design.md:72、:91、:122-123、:165；tasks.md:7-8 | design 決策 2、3；tasks 1.1、1.2 | 修正只同步了 design 決策 2、3 內文；資料流圖、時序圖、變異測試目標與已勾選的 tasks 1.1、1.2 仍寫舊做法（以 1 判不存在、包裝回 126），與程式碼矛盾 | PR 備註：由後端同步即可，不需退回 architect |
+| 3 | BE | /code-review | — | — | design.md:122-123、:165 | — | 時序圖與變異測試目標仍寫舊分流 | 不成立：併入本輪 #2 |
+| 4 | BE | /code-review | — | — | tasks.md:7-8 | — | tasks 1.1、1.2 內容為被否決的做法 | 不成立：併入本輪 #2 |
+| 5 | BE | /code-review | — | — | `docs/cicd.md:116` | tasks 2.1 | 文件未列「映像要有 sh」 | 不成立：描述以「…」省略仍正確；無 sh 時回 127 走「無法檢查」安全中止；官方 nginx 映像皆有 sh |
+| 6 | BE | /code-review | 低 | 高 | `deploy/edge/test-install-sites.sh:49` | tasks 1.2；Scenario「無法在容器內執行檢查」 | 包裝腳本未檢查 `docker stop` 結束碼，stop 失敗時案例 3 只印 `FAIL: rc=0`，難以排錯（誤判失敗而非誤判通過） | PR 備註：`stop` 失敗時印出明確訊息並 exit 1 |
+| 7 | BE | /code-review | — | — | `deploy/edge/test-install-sites.sh:12`、`:83` | — | 中斷執行會累積已停止的 mygo-v2 容器 | 不成立：同第 2 輪 #5 |
+| 8 | BE | /code-review | — | — | `deploy/edge/test-install-sites.sh:83` | design 決策 3 | 案例 3 必須放最後，只靠註解維持 | 不成立：design 決策 3 已明訂，現況符合，屬可維護性意見 |
+
+- **結果**：通過
