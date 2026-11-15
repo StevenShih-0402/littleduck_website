@@ -11,11 +11,11 @@
   integrator 檢查、PR 前審查、CI 或 PR 中檢查退回時改回被退回那一端的 backend／frontend（退回 architect 為 proposal）。
   合併隊列失敗不改階段，停下交給 user。 -->
 
-- **階段**：pr-checking <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
-- **最後完成**：integrator 收尾（開 PR）
-- **下一步**：PR 中檢查（預期 CI 失敗；演練 PR 不可合併）
-- **暫停原因**：無
-- **更新**：Teshima — 2026-11-15
+- **階段**：backend <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
+- **最後完成**：PR 中檢查 7.1（CI 失敗）
+- **下一步**：（演練）不退回後端，關閉 PR
+- **暫停原因**：PR 中檢查退回第 1 次（CI 失敗，演練預期結果；依 user 決定中斷，不派後端修正）
+- **更新**：主對話 — 2026-11-15
 
 ---
 
@@ -69,3 +69,14 @@
 - review.md PR 備註：0 條
 - 風險：PR 不可合併，CI 預期失敗；驗收後直接關閉。
 - **收尾 HEAD**：`1263cb5b9eaa26a0c9503ad44f7c63d97588aaaa`
+
+---
+
+## 主對話 — PR 中檢查第 1 輪 7.1 CI — 2026-11-15 21:55
+
+- **做了什麼**：PR #17（https://github.com/StevenShih-0402/littleduck_website/pull/17）以 `gh pr checks --watch --fail-fast`（上限 30 分鐘）等待 CI，結束碼 1。
+- **CI 結果**：`continuous-integration/drone/pr` fail — Drone 建置 #14：https://drone.stevenshih-littleduck.com/StevenShih-0402/littleduck_website/14
+- **未完成**：本輪 7.2 以後不做（CI 失敗即退回）。
+- **風險**：無。失敗是演練預期結果（`TestCIFailureDrill` 在 `DRONE=true` 時 `t.Fatal`）。
+- **API 契約變動**：無
+- **退回**：退回後端（yasumi），原因：CI check `continuous-integration/drone/pr` 失敗（ci-backend，建置 #14），第 1 次。**演練：依 user 事前決定，看到第一次退回即中斷流程，不派後端修正，PR 直接關閉、不合併。**
