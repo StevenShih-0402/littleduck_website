@@ -171,9 +171,13 @@ Hetzner 主機的 80／443 由 mygo_v2_anon 的 Nginx 佔用。本 repo 的站�
 
 | 階段 | 起點→終點 | 耗時 | 量測日期 |
 |------|-----------|------|----------|
-| PR CI | PR 開啟 → `continuous-integration/drone/pr` 成功 | 待量測 | 待量測 |
+| PR CI | PR 開啟 → `continuous-integration/drone/pr` 成功 | 約 12 分 05 秒（`ci-backend` 6:16 + `ci-frontend` 5:47） | 2026-11-15 |
 | 後端 Staging | 合併 → `cd-backend-staging` 完成 | 待量測 | 待量測 |
 | 前端 Staging | 合併 → `cd-frontend-staging` 完成 | 待量測 | 待量測 |
-| 後端 Production | promote → `cd-backend-production` 完成 | 待量測 | 待量測 |
-| 前端 Production | promote → `cd-frontend-production` 完成 | 待量測 | 待量測 |
+| 後端 Production | promote → `cd-backend-production` 完成 | 22 秒 | 2026-11-15 |
+| 前端 Production | promote → `cd-frontend-production` 完成 | 20 秒 | 2026-11-15 |
 | 全程 | PR 開啟 → Production 冒煙通過 | 待量測 | 待量測 |
+
+- runner 的 `DRONE_RUNNER_CAPACITY` 是 1，同一次建置的 pipeline 依序執行，所以 PR CI 是兩個 CI pipeline 相加。合併到 `main` 的建置還要再排 `cd-*-staging`，比 PR CI 更久。
+- Staging 與全程的耗時，第一次上線時因中途修設定、重跑多次，數字不具代表性，留待下一次正常合併時量測。
+- Production 不重新建置映像，只做部署與冒煙，所以只要二十幾秒。
