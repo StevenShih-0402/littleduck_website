@@ -10,7 +10,6 @@
 # 部署用 secret 一律不勾「Allow Pull Requests」，PR 建置拿不到。secret 清單見 docs/cicd.md。
 # YAML 內的 shell 變數一律寫成 $$VAR，避免被 Drone 的變數替換吃掉。
 
----
 kind: pipeline
 type: docker
 name: ci-backend
