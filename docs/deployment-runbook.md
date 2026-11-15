@@ -185,6 +185,23 @@
 
 ## 6. 回滾
 
+**先到 GHCR 查歷史 tag**：GitHub → 個人頁 → Packages → `littleduck-api`／`littleduck-web`，或以有 `read:packages` 的 token 執行：
+
+```bash
+gh api /users/StevenShih-0402/packages/container/littleduck-api/versions --jq '.[] | "\(.created_at) \(.metadata.container.tags|join(","))"'
+```
+
+不要只看主機上的 `docker image ls`。runner 與部署主機是同一台，CD 最後的 `cleanup` 會刪掉本次建出的映像，連剛部署的那個 tag 也一起刪掉（執行中的容器不受影響）。所以主機上通常只剩舊 tag，看不到完整歷史。回滾時 `docker compose up` 會從 GHCR 重新拉映像，**主機要能連到 GHCR**，`deploy` 帳號的 `docker login ghcr.io` 也要有效。
+
+各環境的對照：
+
+| 環境 | 目錄 | compose 檔 | 容器 |
+|------|------|------------|------|
+| 後端 Production | `/opt/littleduck-api` | `docker-compose.prod.yml` | `littleduck-api` |
+| 後端 Staging | `/opt/littleduck-api-staging` | `docker-compose.staging.yml` | `littleduck-api-staging` |
+| 前端 Production | `/opt/littleduck-web` | `docker-compose.prod.yml` | `littleduck-web` |
+| 前端 Staging | `/opt/littleduck-web-staging` | `docker-compose.staging.yml` | `littleduck-web-staging` |
+
 ### 後端
 
 SSH 到主機，改用前一個已知良好的不可變 tag：
@@ -192,29 +209,37 @@ SSH 到主機，改用前一個已知良好的不可變 tag：
 ```bash
 ssh deploy@<主機>
 cd /opt/littleduck-api
-docker image ls ghcr.io/stevenshih-0402/littleduck-api   # 或到 GitHub → Packages 查歷史 tag
+cat image.txt                                   # 目前的版本，回滾後要還原時用得到
 echo ghcr.io/stevenshih-0402/littleduck-api:<前一版>-<sha> > image.txt
 LITTLEDUCK_API_IMAGE=$(cat image.txt) docker compose -f docker-compose.prod.yml up -d
-docker inspect -f '{{.State.Health.Status}}' littleduck-api   # 等到 healthy
+docker inspect -f '{{.Config.Image}} {{.State.Health.Status}}' littleduck-api   # 確認 tag 正確且為 healthy，剛啟動時會先顯示 starting
 curl -fsS https://api.stevenshih-littleduck.com/health
 ```
 
 也可以在 Drone 對前一個良好的建置重新 promote 到 `production`，效果相同，而且會跑冒煙測試。
 
+回滾只重建 api 容器，資料庫容器維持運作，不會被重建。
+
 **資料庫 migration 不會自動回退。** AutoMigrate 只會新增欄位與資料表，舊版程式通常能在新 schema 上運作。若新版做了不相容的 schema 變更，回滾前要先人工評估。
 
 ### 前端
 
-與後端相同，改用前一個不可變 tag（Staging 目錄為 `/opt/littleduck-web-staging`、檔案 `docker-compose.staging.yml`、容器 `littleduck-web-staging`）：
+與後端相同，改用前一個不可變 tag（Staging 的目錄、compose 檔、容器名稱見上方對照表）：
 
 ```bash
 ssh deploy@<主機>
 cd /opt/littleduck-web
-docker image ls ghcr.io/stevenshih-0402/littleduck-web   # 或到 GitHub → Packages 查歷史 tag
+cat image.txt                                   # 目前的版本，回滾後要還原時用得到
 echo ghcr.io/stevenshih-0402/littleduck-web:<前一版>-<sha> > image.txt
 LITTLEDUCK_WEB_IMAGE=$(cat image.txt) docker compose -f docker-compose.prod.yml up -d
-docker inspect -f '{{.State.Health.Status}}' littleduck-web   # 等到 healthy
+docker inspect -f '{{.Config.Image}} {{.State.Health.Status}}' littleduck-web   # 確認 tag 正確且為 healthy，剛啟動時會先顯示 starting
 curl -fsS https://stevenshih-littleduck.com/runtime-config.js
 ```
 
 也可以在 Drone 對前一個良好的建置重新 promote 到 `production`，效果相同，而且會跑冒煙測試。前端沒有資料庫，不需評估 schema。
+
+### 演練紀錄
+
+| 日期 | 環境 | 內容 | 結果 |
+|------|------|------|------|
+| 2026-11-15 | 後端 Staging | `0.1.0-a2bb8cf` → `0.1.0-4e5d2e1` → 還原 `0.1.0-a2bb8cf` | 兩次切換都 healthy、`/health` 回 200，db 未重建；還原時從 GHCR 重新拉映像 |

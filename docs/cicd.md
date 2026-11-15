@@ -167,17 +167,16 @@ Hetzner 主機的 80／443 由 mygo_v2_anon 的 Nginx 佔用。本 repo 的站�
 
 ## 各階段耗時
 
-由 user 實機量測後填寫（對應 SDP-113 tasks 6.1）；耗時與日期在量測前維持「待量測」。
+由 user 實機量測（對應 SDP-113 tasks 6.1）。
 
 | 階段 | 起點→終點 | 耗時 | 量測日期 |
 |------|-----------|------|----------|
-| PR CI | PR 開啟 → `continuous-integration/drone/pr` 成功 | 約 12 分 05 秒（`ci-backend` 6:16 + `ci-frontend` 5:47） | 2026-11-15 |
-| 後端 Staging | 合併 → `cd-backend-staging` 完成 | 待量測 | 待量測 |
-| 前端 Staging | 合併 → `cd-frontend-staging` 完成 | 待量測 | 待量測 |
-| 後端 Production | promote → `cd-backend-production` 完成 | 22 秒 | 2026-11-15 |
-| 前端 Production | promote → `cd-frontend-production` 完成 | 20 秒 | 2026-11-15 |
-| 全程 | PR 開啟 → Production 冒煙通過 | 待量測 | 待量測 |
+| PR CI | PR 開啟 → `continuous-integration/drone/pr` 成功 | 7 分 16 秒（快取未建立的第一次約 12 分 05 秒） | 2026-11-15 |
+| 後端＋前端 Staging | 合併 → push 建置成功（含 `ci-*` 與兩個 `cd-*-staging`） | 8 分 15 秒 | 2026-11-15 |
+| 後端 Production | promote → `cd-backend-production` 完成 | 17–22 秒 | 2026-11-15 |
+| 前端 Production | promote → `cd-frontend-production` 完成 | 20–21 秒 | 2026-11-15 |
+| 全程 | PR 開啟 → Production 冒煙通過 | 22 分（機器執行約 16 分 10 秒，其餘是等人合併與 promote） | 2026-11-15 |
 
 - runner 的 `DRONE_RUNNER_CAPACITY` 是 1，同一次建置的 pipeline 依序執行，所以 PR CI 是兩個 CI pipeline 相加。合併到 `main` 的建置還要再排 `cd-*-staging`，比 PR CI 更久。
-- Staging 與全程的耗時，第一次上線時因中途修設定、重跑多次，數字不具代表性，留待下一次正常合併時量測。
+- 數字取自 PR #16（13:03:09 開 PR → 13:10:25 CI 成功 → 13:10:43 合併 → 13:18:58 Staging 完成 → 13:24:30 promote → 13:25:09 Production 完成，UTC）。GitHub 只回報整個建置的狀態，所以後端與前端 Staging 合併計算。
 - Production 不重新建置映像，只做部署與冒煙，所以只要二十幾秒。
