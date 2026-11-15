@@ -163,6 +163,27 @@
 7. **第一次部署**：合併 PR 到 `main` 後 `cd-frontend-staging` 會建立 Staging，用 `smoke` 階段確認 `/runtime-config.js` 含 Staging 後端位址。Production 等第一次 promote。
 8. **移除舊託管服務**：Production promote 成功、確認新站正常後，才刪除舊託管服務上的前端專案，並刪除 Drone 裡殘留的四個舊 secret（token、org id、project id、preview bypass，名稱都以該服務的名字開頭）。在那之前保留舊專案，作為整體回退的後路（把 DNS 指回去）。
 
+   刪除後就無法用「把 DNS 指回去」回退，請依序做：
+
+   1. **確認新站已接手**：
+      ```bash
+      dig +short A stevenshih-littleduck.com            # 只有主機 IP
+      dig +short A staging.stevenshih-littleduck.com    # 只有主機 IP
+      dig +short CNAME stevenshih-littleduck.com        # 沒有輸出
+      curl -fsS https://stevenshih-littleduck.com/runtime-config.js        # 指向 https://api.stevenshih-littleduck.com
+      ```
+      再到 Cloudflare DNS 確認沒有其他記錄（例如 `www`）還指向舊服務。有的話，先改指主機或刪掉。
+   2. **解除網域綁定**：在舊服務的專案設定 → Domains，移除 `stevenshih-littleduck.com`、`staging.stevenshih-littleduck.com` 與其他自訂網域。先解除綁定，以免之後別人把同一個網域加到他們的專案時出現衝突。
+   3. **刪除專案**：在專案設定最底下的刪除區塊，輸入專案名稱確認刪除。部署紀錄、環境變數與預覽網址會一起刪除，無法復原。
+   4. **撤銷 token**：在舊服務的帳號設定 → Tokens，刪除當初給 CD 用的那把 token。只刪 Drone secret 的話，token 本身仍然有效。
+   5. **移除 GitHub 整合**：在 GitHub → Settings → Applications → Installed GitHub Apps，找到舊服務的 App，按 Configure。只用在本 repo 的話就 Uninstall；還有其他 repo 在用的話，在 Repository access 把 `littleduck_website` 移除。沒移除的話，它可能繼續在 PR 上留言或建立預覽部署。
+   6. **刪除 Drone 裡的舊 secret**：在 repo 的 Settings → Secrets 刪除。也可以用 CLI 先列出全部 secret，再刪掉不在下表中的那四個：
+      ```bash
+      drone secret ls StevenShih-0402/littleduck_website
+      drone secret rm --name <舊 secret 名稱> StevenShih-0402/littleduck_website
+      ```
+      目前流水線用到的 secret 只有這 8 個，其他的都可以刪：`ghcr_username`、`ghcr_token`、`hetzner_host`、`deploy_ssh_key`、`api_host`、`api_staging_host`、`frontend_host`、`frontend_staging_host`。刪完後在 `.drone.yml` 執行 `git grep -n from_secret`，確認沒有任何 pipeline 引用已刪除的名稱。
+
 ## 4. 確認 CI 會回報到 PR
 
 開一個只改文件的 PR，然後執行 `gh pr checks <PR>`。應該看到 `continuous-integration/drone/pr` 且狀態為成功；GHCR 不應出現新的映像。
