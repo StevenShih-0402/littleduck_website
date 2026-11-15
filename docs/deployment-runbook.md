@@ -47,8 +47,8 @@
 4. **放 Nginx 站台**：在本機渲染後上傳，再到主機上安裝。
    ```bash
    DRONE_HOST=drone.stevenshih-littleduck.com deploy/edge/render.sh /tmp/sites drone
-   scp /tmp/sites/littleduck-drone.conf deploy/edge/install-sites.sh deploy@<主機>:/tmp/
-   ssh deploy@<主機> 'sh /tmp/install-sites.sh /tmp'
+   scp -i ~/.ssh/hetzner_prod_deploy /tmp/sites/littleduck-drone.conf deploy/edge/install-sites.sh deploy@<主機>:/tmp/
+   ssh -i ~/.ssh/hetzner_prod_deploy deploy@<主機> 'sh /tmp/install-sites.sh /tmp'
    ```
 5. **啟用 repo**：用 `DRONE_USER_FILTER` 列出的帳號登入 `https://drone.stevenshih-littleduck.com`，啟用 `littleduck_website`，然後在 repo 設定中：
    - 勾選 **Trusted**。CI 要掛載主機的 docker.sock 與快取目錄，只有管理員能設定。
