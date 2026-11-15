@@ -11,11 +11,11 @@
   integrator 檢查、PR 前審查、CI 或 PR 中檢查退回時改回被退回那一端的 backend／frontend（退回 architect 為 proposal）。
   合併隊列失敗不改階段，停下交給 user。 -->
 
-- **階段**：reviewing <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
-- **最後完成**：PR 前審查
-- **下一步**：Teshima 收尾
+- **階段**：pr-checking <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
+- **最後完成**：integrator 收尾（開 PR）
+- **下一步**：PR 中檢查（預期 CI 失敗；演練 PR 不可合併）
 - **暫停原因**：無
-- **更新**：主對話 — 2026-11-15
+- **更新**：Teshima — 2026-11-15
 
 ---
 
@@ -56,3 +56,16 @@
 - 核對：tasks 全勾；無 API／migration 變更；僅動 1 個後端測試檔（無越界）；未動 proposal.md；worktree 乾淨且與 origin 一致。
 - 規格免同步聲明：無。專案無 openspec/spec-sync.yaml 規則適用。
 - 風險：PR 不可合併，CI 預期失敗（本演練目的）。
+
+---
+
+## integrator（Teshima）— 收尾
+
+- 重切前 SHA `OLD`：`2655fe82d9e79b36220e375b3cec041707b616a0`
+- 重切起點 `FROM`：`a2bb8cf25e4e964884cff3fa0f1225e6f83ae4a1`
+- 重切後 commit：`a4471c4 test(api): 新增 CI 失敗演練測試（SDP-169）`、`1263cb5 docs(openspec): 新增 SDP-169 CI 失敗演練變更提案與審查紀錄`
+- tree 比對：`git diff OLD HEAD` 為空
+- PR：https://github.com/StevenShih-0402/littleduck_website/pull/17（標題「【演練・不可合併】」）
+- review.md PR 備註：0 條
+- 風險：PR 不可合併，CI 預期失敗；驗收後直接關閉。
+- **收尾 HEAD**：`1263cb5b9eaa26a0c9503ad44f7c63d97588aaaa`
