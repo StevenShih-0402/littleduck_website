@@ -113,7 +113,7 @@ Hetzner 主機的 80／443 由 mygo_v2_anon 的 Nginx 佔用。本 repo 的站�
 1. 用 `deploy/edge/render.sh` 只帶入網域變數，產生 `littleduck-*.conf`。
 2. 在主機上執行 `install-sites.sh`，把設定放進 `/opt/edge-sites/`。
 
-`install-sites.sh` 放設定前會先檢查憑證存在，放完跑 `nginx -t`，失敗就還原，所以不會把 mygo 的 Nginx 弄壞。
+`install-sites.sh` 放設定前會先檢查憑證存在，放完跑 `nginx -t`，失敗就還原，所以不會把 mygo 的 Nginx 弄壞。憑證檢查是在 mygo 的 Nginx 容器內以 `docker exec … test -f` 進行（前置：Nginx 以相同路徑唯讀掛載 `/etc/letsencrypt`），檢查的就是 Nginx 實際讀得到的檔案，所以 `deploy` 不需要讀主機 `/etc/letsencrypt/live`、`archive`，也不需要放寬它們的權限。本機驗證可執行 `sh deploy/edge/test-install-sites.sh`（需要 Docker）。
 
 ## CD：前端
 

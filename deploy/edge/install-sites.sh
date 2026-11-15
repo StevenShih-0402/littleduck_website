@@ -4,6 +4,7 @@
 
 # 用法：install-sites.sh <渲染好的 .conf 所在目錄>
 # 前置：mygo_v2_anon 的 Nginx 已把主機 /opt/edge-sites 掛到容器 /etc/nginx/edge-sites 並 include *.conf。
+# 前置：Nginx 容器須以相同路徑（/etc/letsencrypt）掛載憑證目錄；憑證檢查在容器內進行，主機目錄權限不影響。
 # 只動 littleduck-*.conf，不碰 mygo 自己的設定。
 set -eu
 
@@ -21,7 +22,18 @@ nginx_container=$(docker ps -q \
 # 憑證沒核發就放設定會讓整個 Nginx 起不來，先擋下
 for conf in "$src_dir"/littleduck-*.conf; do
     for cert in $(grep -o '/etc/letsencrypt/live/[^;]*' "$conf" | sort -u); do
-        [ -f "$cert" ] || { echo "$(basename "$conf")：憑證 $cert 不存在，請先依 runbook 核發" >&2; exit 1; }
+        # 容器內以專屬結束碼 3 表示檔案不存在；docker exec 自身失敗（容器消失、已停止、ID 多行）回 1、125、126、127，不會是 3
+        if docker exec "$nginx_container" sh -c 'test -f "$1" || exit 3' _ "$cert"; then
+            continue
+        else
+            rc=$?
+        fi
+        if [ "$rc" -eq 3 ]; then
+            echo "$(basename "$conf")：憑證 $cert 不存在，請先依 runbook 核發" >&2
+        else
+            echo "$(basename "$conf")：憑證 $cert 無法在 Nginx 容器內檢查（docker exec 回傳 $rc）" >&2
+        fi
+        exit 1
     done
 done
 

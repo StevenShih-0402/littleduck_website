@@ -1,0 +1,6 @@
+openapi: 3.0.3
+info:
+  title: littleduck_website API — sdp-168-install-sites-cert-check
+  version: 0.0.0
+  description: 本次無 API 變動。變更範圍只有 deploy/edge/install-sites.sh 的憑證檢查方式、本機測試腳本與部署文件。
+paths: {}

@@ -50,6 +50,7 @@
    scp -i ~/.ssh/hetzner_prod_deploy /tmp/sites/littleduck-drone.conf deploy/edge/install-sites.sh deploy@<主機>:/tmp/
    ssh -i ~/.ssh/hetzner_prod_deploy deploy@<主機> 'sh /tmp/install-sites.sh /tmp'
    ```
+   憑證檢查由 `install-sites.sh` 在 mygo 的 Nginx 容器內進行，`deploy` 不需要讀 `/etc/letsencrypt`；**不要**放寬 `/etc/letsencrypt/live`、`archive` 的權限（維持 certbot 預設 700）。SDP-117 期間曾以 `chmod 755` 暫時繞過，SDP-168 上線後以 root 執行 `chmod 700 /etc/letsencrypt/live /etc/letsencrypt/archive` 改回。
 5. **啟用 repo**：用 `DRONE_USER_FILTER` 列出的帳號登入 `https://drone.stevenshih-littleduck.com`，啟用 `littleduck_website`，然後在 repo 設定中：
    - 勾選 **Trusted**。CI 要掛載主機的 docker.sock 與快取目錄，只有管理員能設定。
    - 用 drone CLI 執行 `drone repo update --ignore-forks StevenShih-0402/littleduck_website`。repo 是 public，fork 來的 PR 不應在掛著 docker.sock 的 runner 上執行。
@@ -105,7 +106,7 @@
    sudo certbot certonly --webroot -w /var/www/certbot -d api.stevenshih-littleduck.com
    sudo certbot certonly --webroot -w /var/www/certbot -d api.staging.stevenshih-littleduck.com
    ```
-   **要在第一次 CD 之前完成**，否則 `install-sites.sh` 會因找不到憑證而讓部署失敗。站台不會被放上去，所以 mygo 不受影響。
+   **要在第一次 CD 之前完成**，否則 `install-sites.sh` 會因找不到憑證而讓部署失敗。站台不會被放上去，所以 mygo 不受影響。憑證檢查在 Nginx 容器內進行，目錄權限維持 certbot 預設 700，不必放寬。
 5. **確認目錄擁有者**：CD 以 `deploy` 身分寫入部署目錄與 `/opt/edge-sites`。目錄若是 root 擁有，upload 階段解壓會 `Permission denied`。第一次 CD 前以 root 確認：
    ```bash
    ls -ld /opt/littleduck-* /opt/edge-sites /opt/drone            # 擁有者都要是 deploy
@@ -145,7 +146,7 @@
    sudo certbot delete --cert-name staging.stevenshih-littleduck.com
    ```
    並確認 mygo 的 Nginx 設定沒有引用該主機名。
-4. **核發憑證**：兩個主機名各一張，**要在第一次 CD 之前完成**，否則 `install-sites.sh` 找不到憑證會讓部署失敗（站台不會被放上去，mygo 不受影響）。
+4. **核發憑證**：兩個主機名各一張，**要在第一次 CD 之前完成**，否則 `install-sites.sh` 找不到憑證會讓部署失敗（站台不會被放上去，mygo 不受影響）。憑證檢查在 Nginx 容器內進行，`/etc/letsencrypt/live`、`archive` 維持 700，不必放寬。
    ```bash
    sudo certbot certonly --webroot -w /var/www/certbot -d stevenshih-littleduck.com
    sudo certbot certonly --webroot -w /var/www/certbot -d staging.stevenshih-littleduck.com
