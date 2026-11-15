@@ -43,7 +43,13 @@ CONF
 real_docker=$(command -v docker)
 cat > "$work/bin/docker" <<WRAP
 #!/bin/sh
-if [ "\$1" = exec ] && [ "\$3" = test ]; then exit 126; fi
+# ps 回傳容器 ID 後立刻把容器停掉，之後的 docker exec 會得到真實的失敗（容器未執行，回 1）
+if [ "\$1" = ps ]; then
+    id=\$("$real_docker" "\$@") || exit \$?
+    "$real_docker" stop "\$id" >/dev/null
+    echo "\$id"
+    exit 0
+fi
 exec "$real_docker" "\$@"
 WRAP
 chmod +x "$work/bin/docker"
@@ -74,7 +80,7 @@ else
     failc "憑證不存在" "rc=$rc"
 fi
 
-# 案例 3：無法檢查
+# 案例 3：無法檢查（容器已停止；須放最後，會停掉假容器）
 sites=$(new_sites)
 out=$(PATH="$work/bin:$PATH" EDGE_SITES_DIR="$sites" sh "$script" "$work/src-ok" 2>&1); rc=$?
 echo "$out"

@@ -22,12 +22,13 @@ nginx_container=$(docker ps -q \
 # 憑證沒核發就放設定會讓整個 Nginx 起不來，先擋下
 for conf in "$src_dir"/littleduck-*.conf; do
     for cert in $(grep -o '/etc/letsencrypt/live/[^;]*' "$conf" | sort -u); do
-        if docker exec "$nginx_container" test -f "$cert"; then
+        # 容器內以專屬結束碼 3 表示檔案不存在；docker exec 自身失敗（容器消失、已停止、ID 多行）回 1、125、126、127，不會是 3
+        if docker exec "$nginx_container" sh -c 'test -f "$1" || exit 3' _ "$cert"; then
             continue
         else
             rc=$?
         fi
-        if [ "$rc" -eq 1 ]; then
+        if [ "$rc" -eq 3 ]; then
             echo "$(basename "$conf")：憑證 $cert 不存在，請先依 runbook 核發" >&2
         else
             echo "$(basename "$conf")：憑證 $cert 無法在 Nginx 容器內檢查（docker exec 回傳 $rc）" >&2
