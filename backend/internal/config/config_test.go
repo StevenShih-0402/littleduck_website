@@ -34,6 +34,8 @@ func TestLoad_ReadsAllEnvironmentVariables(t *testing.T) {
 	t.Setenv("ECPAY_HASH_KEY", "key")
 	t.Setenv("ECPAY_HASH_IV", "iv")
 	t.Setenv("ECPAY_ENV", "production")
+	t.Setenv("ECPAY_RETURN_URL", "https://api.example.com/cb")
+	t.Setenv("ECPAY_CLIENT_BACK_URL", "https://www.example.com/sponsor/result")
 
 	// Act
 	cfg, err := Load()
@@ -53,7 +55,9 @@ func TestLoad_ReadsAllEnvironmentVariables(t *testing.T) {
 		t.Errorf("Log 組態錯誤: %+v", cfg.Log)
 	}
 	if cfg.ECPay.MerchantID != "2000132" || cfg.ECPay.HashKey != "key" ||
-		cfg.ECPay.HashIV != "iv" || cfg.ECPay.Env != "production" {
+		cfg.ECPay.HashIV != "iv" || cfg.ECPay.Env != "production" ||
+		cfg.ECPay.ReturnURL != "https://api.example.com/cb" ||
+		cfg.ECPay.ClientBackURL != "https://www.example.com/sponsor/result" {
 		t.Errorf("ECPay 組態錯誤: %+v", cfg.ECPay)
 	}
 	if cfg.Auth.AdminUsername != "admin" || cfg.Auth.AdminPassword != "admin-pass" ||
@@ -205,5 +209,31 @@ func TestDBConfig_DSNComposesConnectionString(t *testing.T) {
 	want := "host=db port=5432 user=duck password=secret dbname=littleduck sslmode=disable"
 	if dsn != want {
 		t.Errorf("DSN() = %q, want %q", dsn, want)
+	}
+}
+
+func TestECPayConfig_Configured(t *testing.T) {
+	full := ECPayConfig{MerchantID: "m", HashKey: "k", HashIV: "i", ReturnURL: "r", ClientBackURL: "c"}
+	tests := []struct {
+		name   string
+		mutate func(c *ECPayConfig)
+		want   bool
+	}{
+		{"全部設定", func(c *ECPayConfig) {}, true},
+		{"缺 MerchantID", func(c *ECPayConfig) { c.MerchantID = "" }, false},
+		{"缺 HashKey", func(c *ECPayConfig) { c.HashKey = "" }, false},
+		{"缺 HashIV", func(c *ECPayConfig) { c.HashIV = "" }, false},
+		{"缺 ReturnURL", func(c *ECPayConfig) { c.ReturnURL = "" }, false},
+		{"缺 ClientBackURL", func(c *ECPayConfig) { c.ClientBackURL = "" }, false},
+		{"全空", func(c *ECPayConfig) { *c = ECPayConfig{} }, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c := full
+			tc.mutate(&c)
+			if got := c.Configured(); got != tc.want {
+				t.Errorf("Configured() = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }

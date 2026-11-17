@@ -48,12 +48,20 @@ type AuthConfig struct {
 	JWTTTL        time.Duration // JWT_TTL（必要）：權杖有效期（Go duration，如 24h）
 }
 
-// ECPayConfig 綠界金流組態（骨架階段允許留空）
+// ECPayConfig 綠界金流組態（允許留空；設定不完整時建立付款回 503，不影響服務啟動）
 type ECPayConfig struct {
-	MerchantID string // ECPAY_MERCHANT_ID
-	HashKey    string // ECPAY_HASH_KEY
-	HashIV     string // ECPAY_HASH_IV
-	Env        string // ECPAY_ENV：stage / production，預設 stage
+	MerchantID    string // ECPAY_MERCHANT_ID
+	HashKey       string // ECPAY_HASH_KEY
+	HashIV        string // ECPAY_HASH_IV
+	Env           string // ECPAY_ENV：stage / production，預設 stage
+	ReturnURL     string // ECPAY_RETURN_URL：綠界 server-to-server 付款結果通知網址
+	ClientBackURL string // ECPAY_CLIENT_BACK_URL：付款後導回前台的網址
+}
+
+// Configured 回傳建立付款所需的設定是否齊全（MerchantID、HashKey、HashIV、ReturnURL、ClientBackURL 皆非空）
+func (c ECPayConfig) Configured() bool {
+	return c.MerchantID != "" && c.HashKey != "" && c.HashIV != "" &&
+		c.ReturnURL != "" && c.ClientBackURL != ""
 }
 
 // Config 全部組態的彙總 struct，於啟動時載入一次後注入各層
@@ -109,6 +117,9 @@ func Load() (*Config, error) {
 			HashKey:    os.Getenv("ECPAY_HASH_KEY"),
 			HashIV:     os.Getenv("ECPAY_HASH_IV"),
 			Env:        getEnv("ECPAY_ENV", "stage"),
+
+			ReturnURL:     os.Getenv("ECPAY_RETURN_URL"),
+			ClientBackURL: os.Getenv("ECPAY_CLIENT_BACK_URL"),
 		},
 	}, nil
 }

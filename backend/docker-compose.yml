@@ -17,10 +17,14 @@ services:
       DB_NAME: littleduck
       DB_SSLMODE: disable
       LOG_LEVEL: info
-      ECPAY_MERCHANT_ID: ""
-      ECPAY_HASH_KEY: ""
-      ECPAY_HASH_IV: ""
-      ECPAY_ENV: stage
+      # 綠界金流：預設為綠界官方文件公開的 stage 測試特店與本機網址（本機收不到綠界真實通知，
+      # 因 ReturnURL 對綠界不可達）；Staging／Production 的值由部署 .env 提供，不寫進版控
+      ECPAY_MERCHANT_ID: "${ECPAY_MERCHANT_ID:-3002607}"
+      ECPAY_HASH_KEY: "${ECPAY_HASH_KEY:-pwFHCqoQZGmho4w6}"
+      ECPAY_HASH_IV: "${ECPAY_HASH_IV:-EkRm7iFT261dpevs}"
+      ECPAY_ENV: "${ECPAY_ENV:-stage}"
+      ECPAY_RETURN_URL: "${ECPAY_RETURN_URL:-http://localhost:8080/api/v1/payments/ecpay/callback}"
+      ECPAY_CLIENT_BACK_URL: "${ECPAY_CLIENT_BACK_URL:-http://localhost:3000/sponsor/result}"
       # 後台登入（單一管理員 + JWT）— 本機開發預設值，正式部署請以 deploy 的 .env 覆寫
       ADMIN_USERNAME: "${ADMIN_USERNAME:-admin}"
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:-admin1234}"
