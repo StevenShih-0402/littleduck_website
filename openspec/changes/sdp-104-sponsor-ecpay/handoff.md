@@ -11,9 +11,9 @@
   integrator 檢查、PR 前審查、CI 或 PR 中檢查退回時改回被退回那一端的 backend／frontend（退回 architect 為 proposal）。
   合併隊列失敗不改階段，停下交給 user。 -->
 
-- **階段**：reviewing <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
-- **最後完成**：PR 前審查
-- **下一步**：Teshima 收尾
+- **階段**：pr-checking <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
+- **最後完成**：integrator 收尾（開 PR）
+- **下一步**：PR 中檢查
 - **暫停原因**：無
 - **更新**：主對話 — 2026-11-17（PR 前審查第 1 輪通過）
 
@@ -104,3 +104,19 @@
 - **規格免同步聲明**：無
 - **風險**：高風險檔案（金流、model、docker-compose）合併前需 user 審批；付款成功路徑僅能在 Staging 實測；既有資料庫 migration 本次未重測；結果頁查無交易會輪詢到用盡後顯示「還在確認付款結果」而非「付款未完成」（Fujimori 已知限制）。
 - **退回**：無
+
+---
+
+## integrator（Teshima）— 收尾
+
+- **重切前 SHA（OLD）**：`12ff23a4294f0cd9b1373bc0c1de47b1ab4d8577`
+- **重切起點（FROM）**：`3ef23b10e3541cb7c95ddb970616cd86c7ffc9ae`（merge-base）
+- **重切後 commit**：
+  - `17348c6` feat(payment): 新增 CheckMacValue 驗章並改寫綠界適配層
+  - `d72c96a` feat(api): 贊助改走綠界付款流程與功能開關
+  - `8c7015c` feat(web): 贊助視窗串接綠界付款、付款結果頁與後台已付款統計
+  - `e74703f` docs(openspec): 新增 SDP-104 贊助綠界付款變更提案與審查紀錄
+- **tree 比對**：`git diff OLD HEAD` 為空
+- **PR**：https://github.com/StevenShih-0402/littleduck_website/pull/20（附 3 條 FE PR 備註）
+- **風險**：高風險檔案（金流、model、docker-compose）合併前需 user 審批；付款成功路徑僅能在 Staging 實測。
+- **收尾 HEAD**：`e74703f9016bd3b70464102201f4dc41cb9470e1`
