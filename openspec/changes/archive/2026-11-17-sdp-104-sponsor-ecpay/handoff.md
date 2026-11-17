@@ -11,11 +11,11 @@
   integrator 檢查、PR 前審查、CI 或 PR 中檢查退回時改回被退回那一端的 backend／frontend（退回 architect 為 proposal）。
   合併隊列失敗不改階段，停下交給 user。 -->
 
-- **階段**：awaiting-approval <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
-- **最後完成**：PR 中檢查
-- **下一步**：等待 user 回覆「合併」後歸檔
-- **暫停原因**：高風險，等待 user 回覆合併
-- **更新**：主對話 — 2026-11-17（等待高風險審批）
+- **階段**：archived <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
+- **最後完成**：integrator 歸檔
+- **下一步**：合併
+- **暫停原因**：無
+- **更新**：integrator（Teshima）— 2026-11-17（歸檔）
 
 ---
 
@@ -120,3 +120,10 @@
 - **PR**：https://github.com/StevenShih-0402/littleduck_website/pull/20（附 3 條 FE PR 備註）
 - **風險**：高風險檔案（金流、model、docker-compose）合併前需 user 審批；付款成功路徑僅能在 Staging 實測。
 - **收尾 HEAD**：`e74703f9016bd3b70464102201f4dc41cb9470e1`
+
+---
+
+## integrator（Teshima）— 歸檔
+
+- 歸檔至 `openspec/changes/archive/2026-11-17-sdp-104-sponsor-ecpay/`，同步規格 `feature-flags`（2 modified）、`payment-integration`（7 added、2 removed）。
+- `openspec validate --specs`：24 passed, 0 failed。
