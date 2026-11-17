@@ -58,10 +58,14 @@ backend/
 | `ADMIN_PASSWORD` | ✅ | — | 後台單一管理員密碼 |
 | `JWT_SECRET` | ✅ | — | JWT HS256 簽章秘鑰 |
 | `JWT_TTL` | ✅ | — | JWT 有效期（Go duration 如 `24h`，或純數字＝秒） |
-| `ECPAY_MERCHANT_ID` | — | — | 綠界商店代號（正式串接時必要） |
-| `ECPAY_HASH_KEY` | — | — | 綠界 HashKey（正式串接時必要） |
-| `ECPAY_HASH_IV` | — | — | 綠界 HashIV（正式串接時必要） |
-| `ECPAY_ENV` | — | `stage` | 綠界環境：`stage` / `production` |
+| `ECPAY_MERCHANT_ID` | — | — | 綠界商店代號；設定不完整時建立付款回 503 `PAYMENT_UNAVAILABLE`（服務照常啟動） |
+| `ECPAY_HASH_KEY` | — | — | 綠界 HashKey；同上 |
+| `ECPAY_HASH_IV` | — | — | 綠界 HashIV；同上 |
+| `ECPAY_ENV` | — | `stage` | 綠界環境：`stage` / `production`（只有 `production` 送往正式環境，其餘一律測試環境） |
+| `ECPAY_RETURN_URL` | — | — | 綠界 server-to-server 付款結果通知網址（需為綠界可連線的對外網址，如 `https://<api 主機>/api/v1/payments/ecpay/callback`）；設定不完整時建立付款回 503 |
+| `ECPAY_CLIENT_BACK_URL` | — | — | 付款後導回前台的網址（如 `https://<web 主機>/sponsor/result`），後端會附上 `?trade_no=<交易編號>`；設定不完整時建立付款回 503 |
+
+綠界的正式特店代號、HashKey、HashIV 與 Staging／Production 的對外網址**只放各環境部署時的 `.env`**，不寫進版控；`docker-compose.yml` 預設值只有綠界官方文件公開的測試特店與本機網址。管理員預覽（帶有效管理員 JWT）建立的是**真實訂單**：連到正式環境時會真的向信用卡扣款，預覽請在 stage 環境進行。
 
 缺少必要變數時服務啟動即失敗（fail-fast）並列出全部缺漏項。
 
@@ -121,8 +125,9 @@ make swag                    # 等同 swag init -g cmd/server/main.go -o docs
 | GET | `/api/v1/features` | 公開 | 功能開關對照表 `{key: boolean}` |
 | GET | `/api/v1/settings` | 公開 | 讀取網站設定 |
 | POST | `/api/v1/stats/pageview` | 公開 | 回報瀏覽事件（非阻塞，回 204） |
-| POST | `/api/v1/payments` | 公開 | 建立付款（骨架，回 501） |
-| POST | `/api/v1/payments/ecpay/callback` | 公開 | 綠界 callback（骨架，回 501） |
+| POST | `/api/v1/payments` | 公開（選用權杖） | 建立贊助付款（金額 10～20000）：新增 `pending` 贊助紀錄並回傳綠界表單網址與欄位。`sponsor` 與 `sponsor_payment` 任一停用回 403 `FEATURE_DISABLED`（有效管理員權杖放行，無效權杖視同訪客）；綠界設定不完整回 503 `PAYMENT_UNAVAILABLE` |
+| POST | `/api/v1/payments/ecpay/callback` | 公開 | 綠界付款結果通知（ReturnURL）：驗 CheckMacValue、MerchantID、金額後條件更新狀態；一律 200 `text/plain`（`1|OK` 或 `0|原因`），不受功能開關影響 |
+| GET | `/api/v1/payments/:trade_no` | 公開 | 查詢付款狀態（只回 `trade_no`、`amount`、`status`；不存在回 404） |
 | GET | `/api/v1/admin/articles` | 🔒 | 後台文章列表（含草稿） |
 | POST | `/api/v1/articles` | 🔒 | 建立文章 |
 | PUT | `/api/v1/articles/:id` | 🔒 | 修改文章（含發布狀態） |
@@ -139,7 +144,7 @@ make swag                    # 等同 swag init -g cmd/server/main.go -o docs
 
 ### 功能開關
 
-開關登記表在 `internal/service/feature_service.go`（`sponsor`、`guestbook`、`article_comments`），啟動 seed 只補缺的 key、不覆寫既有值。新增功能：在登記表加一列、前端以 `FeatureGate` 包住；有公開寫入端點的功能要在 service 層比照 `comment_service.go` 做後端把關。
+開關登記表在 `internal/service/feature_service.go`（`sponsor`、`guestbook`、`article_comments`、`sponsor_payment`；`sponsor_payment` 預設停用，贊助視窗需與 `sponsor` 兩者都啟用才對外顯示並可建立付款），啟動 seed 只補缺的 key、不覆寫既有值。新增功能：在登記表加一列、前端以 `FeatureGate` 包住；有公開寫入端點的功能要在 service 層比照 `comment_service.go` 做後端把關。
 
 ### 錯誤碼
 
@@ -147,7 +152,8 @@ make swag                    # 等同 swag init -g cmd/server/main.go -o docs
 |---|---|---|
 | `BAD_REQUEST` | 400 | 請求內容錯誤 |
 | `UNAUTHORIZED` | 401 | 缺少或無效的權杖 |
-| `FEATURE_DISABLED` | 403 | 功能已被管理員停用（目前由 `POST /comments` 回傳） |
+| `FEATURE_DISABLED` | 403 | 功能已被管理員停用（由 `POST /comments`、`POST /payments` 回傳） |
 | `NOT_FOUND` | 404 | 資源不存在 |
 | `NOT_IMPLEMENTED` | 501 | 尚未實作 |
 | `INTERNAL_ERROR` | 500 | 伺服器內部錯誤 |
+| `PAYMENT_UNAVAILABLE` | 503 | 綠界金流設定不完整，暫時無法建立付款 |

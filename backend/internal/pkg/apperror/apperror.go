@@ -16,6 +16,8 @@ const (
 	CodeInternal        = "INTERNAL_ERROR"
 	CodeNotImplemented  = "NOT_IMPLEMENTED"
 	CodeFeatureDisabled = "FEATURE_DISABLED"
+
+	CodePaymentUnavailable = "PAYMENT_UNAVAILABLE"
 )
 
 // AppError 統一的應用層錯誤，實作 error 介面
@@ -74,6 +76,11 @@ func NotImplemented(message string) *AppError {
 // FeatureDisabled 建立 403 錯誤：功能已被管理員停用
 func FeatureDisabled(message string) *AppError {
 	return New(CodeFeatureDisabled, http.StatusForbidden, message)
+}
+
+// PaymentUnavailable 建立 503 錯誤：金流設定不完整，暫時無法建立付款
+func PaymentUnavailable(message string) *AppError {
+	return New(CodePaymentUnavailable, http.StatusServiceUnavailable, message)
 }
 
 // AsAppError 從錯誤鏈中取出 AppError

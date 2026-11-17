@@ -68,6 +68,12 @@
           "issue": "SDP-149",
           "since": "2026-11-13",
           "note": "ADMIN_TABS 新增「功能開關」分頁（components/admin/admin-features.jsx，非設計稿元件）"
+        },
+        {
+          "target": "components/admin/admin-sponsor.jsx",
+          "issue": "SDP-104",
+          "since": "2026-11-17",
+          "note": "KPI 只計入 status 為 paid 的贊助；紀錄列表新增付款狀態標籤（pending／paid／failed）"
         }
       ]
     },
@@ -141,6 +147,18 @@
           "issue": "SDP-149",
           "since": "2026-11-13",
           "note": "新增 preview prop，預覽時在浮動按鈕旁與視窗標題列顯示「停用中・預覽」小標"
+        },
+        {
+          "target": "components/front/front-shell.jsx",
+          "issue": "SDP-104",
+          "since": "2026-11-17",
+          "note": "SponsorFab 改以 sponsor 與 sponsor_payment 兩層 FeatureGate 包住，兩個開關都啟用才顯示，任一層停用時管理員預覽"
+        },
+        {
+          "target": "components/front/sponsor-fab.jsx",
+          "issue": "SDP-104",
+          "since": "2026-11-17",
+          "note": "贊助改走綠界真實付款：呼叫 createPayment 後以隱藏表單 POST 到綠界，金額驗證 10～20000，移除假的感謝畫面"
         }
       ]
     },

@@ -17,6 +17,7 @@ const (
 	FeatureSponsor         = "sponsor"
 	FeatureGuestbook       = "guestbook"
 	FeatureArticleComments = "article_comments"
+	FeatureSponsorPayment  = "sponsor_payment"
 )
 
 // FeatureDef 開關登記表的一列；名稱與說明放程式碼，不入庫
@@ -32,6 +33,7 @@ var featureRegistry = []FeatureDef{
 	{Key: FeatureSponsor, Name: "贊助按鈕", Description: "前台右下角的贊助浮動按鈕與贊助視窗", Default: true},
 	{Key: FeatureGuestbook, Name: "留言板投書", Description: "留言板頁面的投書表單（已公開的留言照常顯示）", Default: true},
 	{Key: FeatureArticleComments, Name: "文章留言", Description: "文章頁底部的留言表單（已公開的留言照常顯示）", Default: true},
+	{Key: FeatureSponsorPayment, Name: "贊助付款（綠界）", Description: "贊助視窗改走綠界真實付款；需與『贊助按鈕』同時啟用", Default: false},
 }
 
 // FeatureView 後台清單的單筆開關（登記表資訊 + 目前狀態）

@@ -1,0 +1,320 @@
+openapi: 3.0.3
+info:
+  title: LittleDuck API — SDP-104 贊助串接綠界 ECPay
+  version: 0.1.0
+  description: |
+    已由後端 Agent 依實作定稿（與 backend/docs/swagger.yaml 的 /api/v1/payments*、/api/v1/donations 一致）。本次實作 POST /api/v1/payments 與 POST /api/v1/payments/ecpay/callback（原為回 501 的骨架），
+    新增 GET /api/v1/payments/{trade_no}，並在 GET /api/v1/donations 的每筆紀錄新增 status、paid_at、ecpay_trade_no、payment_type，
+    GET /api/v1/features 新增 key sponsor_payment。皆為非破壞性變更。
+    回應使用既有統一封包 {code, message, data}；唯一例外是綠界 callback，依綠界規範回 text/plain。
+servers:
+  - url: http://localhost:8080
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ErrorEnvelope:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum: [BAD_REQUEST, UNAUTHORIZED, NOT_FOUND, INTERNAL_ERROR, FEATURE_DISABLED, PAYMENT_UNAVAILABLE]
+        message:
+          type: string
+    CreatePaymentRequest:
+      type: object
+      required: [amount]
+      properties:
+        amount:
+          type: integer
+          description: 新台幣元，10～20000（含）的整數；不限定為預設按鈕金額
+          example: 100
+        message:
+          type: string
+          maxLength: 100
+          description: 想對小鴨說的話，存入贊助紀錄的 note，不送綠界
+          example: 加油
+        name:
+          type: string
+          maxLength: 50
+          description: 贊助者名稱；未提供或空白時記為「匿名訪客」。前台本次不送此欄
+    CreatePaymentResult:
+      type: object
+      required: [trade_no, action_url, params]
+      properties:
+        trade_no:
+          type: string
+          description: 綠界 MerchantTradeNo，也是贊助紀錄 id（20 碼英數）
+          example: LD261117153012A9K2QZ
+        action_url:
+          type: string
+          description: 前端以 application/x-www-form-urlencoded POST 的綠界 AIO 網址（依 ECPAY_ENV 決定 stage／正式）
+          example: https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5
+        params:
+          type: object
+          description: 要原樣放進表單 hidden input 的全部欄位，值一律為字串
+          additionalProperties:
+            type: string
+          example:
+            MerchantID: "<ECPAY_MERCHANT_ID>"
+            MerchantTradeNo: LD261117153012A9K2QZ
+            MerchantTradeDate: 2026/11/17 15:30:12
+            PaymentType: aio
+            TotalAmount: "100"
+            TradeDesc: LittleDuck 贊助
+            ItemName: 請小鴨喝蜂蜜檸檬 NT$100
+            ReturnURL: https://api.example.com/api/v1/payments/ecpay/callback
+            ClientBackURL: https://www.example.com/sponsor/result?trade_no=LD261117153012A9K2QZ
+            ChoosePayment: Credit
+            EncryptType: "1"
+            CheckMacValue: "<64 碼大寫 SHA256 十六進位>"
+    PaymentStatus:
+      type: object
+      required: [trade_no, amount, status]
+      properties:
+        trade_no:
+          type: string
+        amount:
+          type: integer
+        status:
+          type: string
+          enum: [pending, paid, failed]
+    Donation:
+      type: object
+      description: 後台贊助紀錄；status、paid_at、ecpay_trade_no、payment_type 為本次新增
+      required: [id, date, amt, name, note, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          description: seed 紀錄為 d1…；綠界付款建立的紀錄為 MerchantTradeNo
+        date:
+          type: string
+          example: 2026 / 11 / 17
+        amt:
+          type: integer
+        name:
+          type: string
+        note:
+          type: string
+        status:
+          type: string
+          enum: [pending, paid, failed]
+          description: 本次之前既有的紀錄為 paid
+        paid_at:
+          type: string
+          format: date-time
+          nullable: true
+        ecpay_trade_no:
+          type: string
+          description: 綠界交易編號（通知的 TradeNo），未付款時為空字串
+        payment_type:
+          type: string
+          description: 綠界通知的 PaymentType（例：Credit_CreditCard），未付款時為空字串
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+paths:
+  /api/v1/payments:
+    post:
+      tags: [payments]
+      summary: 建立贊助付款
+      description: |
+        公開端點，可選帶管理員 Authorization: Bearer。非管理員時 sponsor 或 sponsor_payment 任一停用回 403；
+        權杖無效或過期視同訪客（不回 401）。成功時建立一筆 pending 贊助紀錄。
+      security:
+        - {}
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+      responses:
+        '200':
+          description: 建立成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    example: SUCCESS
+                  message:
+                    type: string
+                    example: ok
+                  data:
+                    $ref: '#/components/schemas/CreatePaymentResult'
+        '400':
+          description: 金額缺少、非整數、超出上下限，或 message／name 過長
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: FEATURE_DISABLED（sponsor 或 sponsor_payment 停用，且非管理員）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: INTERNAL_ERROR（含功能開關讀取失敗，fail-closed）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: PAYMENT_UNAVAILABLE（綠界設定不完整）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/payments/ecpay/callback:
+    post:
+      tags: [payments]
+      summary: 綠界付款結果通知（ReturnURL）
+      description: |
+        由綠界 server-to-server 呼叫，不受功能開關影響。一律回 HTTP 200 text/plain：
+        成功或重複通知 `1|OK`；`0|CheckMacValue Error`、`0|MerchantID Error`、`0|Order Not Found`、`0|Amount Mismatch`、`0|Internal Error`。
+        綠界設定不完整（無法驗簽）時一律回 `0|CheckMacValue Error`，不改任何紀錄。
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [MerchantID, MerchantTradeNo, RtnCode, TradeAmt, CheckMacValue]
+              properties:
+                MerchantID:
+                  type: string
+                MerchantTradeNo:
+                  type: string
+                RtnCode:
+                  type: string
+                  description: 1 為付款成功
+                RtnMsg:
+                  type: string
+                TradeNo:
+                  type: string
+                  description: 綠界交易編號
+                TradeAmt:
+                  type: string
+                PaymentDate:
+                  type: string
+                PaymentType:
+                  type: string
+                SimulatePaid:
+                  type: string
+                  description: 1 為綠界後台模擬付款，不改狀態
+                CheckMacValue:
+                  type: string
+              additionalProperties:
+                type: string
+      responses:
+        '200':
+          description: 處理結果
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 1|OK
+  /api/v1/payments/{trade_no}:
+    get:
+      tags: [payments]
+      summary: 查詢付款狀態
+      description: 公開端點，不受功能開關影響；只回傳交易編號、金額、狀態，不含贊助者名稱與留言。
+      parameters:
+        - name: trade_no
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 查詢成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    example: SUCCESS
+                  message:
+                    type: string
+                    example: ok
+                  data:
+                    $ref: '#/components/schemas/PaymentStatus'
+        '404':
+          description: NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/donations:
+    get:
+      tags: [donations]
+      summary: 贊助紀錄列表（後台）
+      description: 既有端點；本次每筆紀錄新增 status、paid_at、ecpay_trade_no、payment_type。
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 贊助紀錄清單（依建立時間新到舊）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    example: SUCCESS
+                  message:
+                    type: string
+                    example: ok
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Donation'
+        '401':
+          description: UNAUTHORIZED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/features:
+    get:
+      tags: [features]
+      summary: 公開功能開關對照表
+      description: 既有端點；本次對照表新增 key sponsor_payment（預設 false）。
+      responses:
+        '200':
+          description: 開關對照表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    example: SUCCESS
+                  message:
+                    type: string
+                    example: ok
+                  data:
+                    type: object
+                    additionalProperties:
+                      type: boolean
+                    example:
+                      sponsor: true
+                      guestbook: true
+                      article_comments: true
+                      sponsor_payment: false

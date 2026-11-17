@@ -186,6 +186,15 @@ export function LakeProvider({ children }) {
     return updated;
   }, []);
 
+  // ── Payment actions（SDP-104）：建立付款回綠界表單欄位；查詢付款狀態 ──
+  const createPayment = React.useCallback(async ({ amount, message }) => {
+    return apiPost("/payments", { amount, message: message || "" });
+  }, []);
+
+  const getPaymentStatus = React.useCallback(async (tradeNo) => {
+    return apiGet("/payments/" + encodeURIComponent(tradeNo));
+  }, []);
+
   // ── Settings action ──
   const updateSettings = React.useCallback(async (next) => {
     const updated = await apiPut("/settings", next);
@@ -212,6 +221,7 @@ export function LakeProvider({ children }) {
     login, logout, reloadAdmin,
     createArticle, updateArticle, deleteArticle,
     postComment, setCommentStatus, replyComment,
+    createPayment, getPaymentStatus,
     updateSettings, reportPageview,
     features, featuresLoaded, featureList, adminPreview: authed && featureList !== null,
     setFeatureEnabled,
