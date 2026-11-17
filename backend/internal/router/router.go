@@ -74,7 +74,9 @@ func New(cfg *config.Config, log *zap.Logger, db *gorm.DB) *gin.Engine {
 	donationCtrl := controller.NewDonationController(
 		service.NewDonationService(repository.NewDonationRepository(db)),
 	)
-	paymentCtrl := controller.NewPaymentController(payment.NewECPayService(cfg.ECPay))
+	paymentCtrl := controller.NewPaymentController(service.NewPaymentService(
+		repository.NewDonationRepository(db), featureSvc, payment.NewECPayService(cfg.ECPay), cfg.ECPay,
+	))
 
 	// 公開路由群組（免驗證）
 	v1 := r.Group("/api/v1")
@@ -94,8 +96,10 @@ func New(cfg *config.Config, log *zap.Logger, db *gorm.DB) *gin.Engine {
 
 		v1.POST("/stats/pageview", statCtrl.RecordPageview)
 
-		v1.POST("/payments", paymentCtrl.Create)
+		// 選用驗證：有效管理員權杖可略過功能開關（預覽），無效權杖視同訪客
+		v1.POST("/payments", middleware.OptionalAuth(authSvc), paymentCtrl.Create)
 		v1.POST("/payments/ecpay/callback", paymentCtrl.ECPayCallback)
+		v1.GET("/payments/:trade_no", paymentCtrl.Status)
 	}
 
 	// 受保護路由群組（需管理員 JWT）

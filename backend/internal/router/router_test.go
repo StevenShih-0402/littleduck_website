@@ -58,6 +58,7 @@ func TestNew_MountsAPIV1Routes(t *testing.T) {
 		{http.MethodGet, "/api/v1/articles"},
 		{http.MethodPost, "/api/v1/payments"},
 		{http.MethodPost, "/api/v1/payments/ecpay/callback"},
+		{http.MethodGet, "/api/v1/payments/NOPE"},
 	} {
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, httptest.NewRequest(tc.method, tc.path, nil))
@@ -119,5 +120,22 @@ func TestNew_PostCommentWithInvalidTokenIsNot401(t *testing.T) {
 	}
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("status = %d, want 400", rec.Code)
+	}
+}
+
+func TestNew_PostPaymentWithInvalidTokenIsNot401(t *testing.T) {
+	// Arrange
+	r := newTestRouter()
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/payments", strings.NewReader(`{"amount":0}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer invalid.token.value")
+
+	// Act：金額不合法在驗證階段即回 400（不會碰資料庫或開關）
+	r.ServeHTTP(rec, req)
+
+	// Assert：路由掛了 OptionalAuth，無效權杖視同訪客，不得回 401
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("POST /payments 帶無效權杖 status = %d, want 400", rec.Code)
 	}
 }

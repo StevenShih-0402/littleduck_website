@@ -894,7 +894,7 @@ const docTemplate = `{
         },
         "/api/v1/payments": {
             "post": {
-                "description": "建立綠界付款交易；骨架階段回傳 501",
+                "description": "建立一筆 pending 贊助紀錄，回傳綠界 AIO 的表單網址與欄位（前端以 POST 表單導向）。金額 10～20000、message ≤100 字、name ≤50 字。\n非管理員時 sponsor 與 sponsor_payment 皆需啟用，否則 403 FEATURE_DISABLED；綠界設定不完整回 503 PAYMENT_UNAVAILABLE。\n可選帶管理員 Authorization: Bearer；權杖有效時略過功能開關（管理員預覽，會建立真實訂單），無效或過期的權杖視同訪客、不回 401。",
                 "consumes": [
                     "application/json"
                 ],
@@ -904,10 +904,63 @@ const docTemplate = `{
                 "tags": [
                     "payments"
                 ],
-                "summary": "建立付款（未實作）",
+                "summary": "建立贊助付款",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "選用：Bearer \u003c管理員 JWT\u003e",
+                        "name": "Authorization",
+                        "in": "header"
+                    },
+                    {
+                        "description": "贊助內容",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/service.PaymentInput"
+                        }
+                    }
+                ],
                 "responses": {
-                    "501": {
-                        "description": "Not Implemented",
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/service.CreatePaymentView"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Envelope"
+                        }
+                    },
+                    "403": {
+                        "description": "功能已停用（FEATURE_DISABLED）",
+                        "schema": {
+                            "$ref": "#/definitions/response.Envelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Envelope"
+                        }
+                    },
+                    "503": {
+                        "description": "綠界設定不完整（PAYMENT_UNAVAILABLE）",
                         "schema": {
                             "$ref": "#/definitions/response.Envelope"
                         }
@@ -917,20 +970,73 @@ const docTemplate = `{
         },
         "/api/v1/payments/ecpay/callback": {
             "post": {
-                "description": "接收綠界付款結果通知；骨架階段回傳 501",
+                "description": "由綠界 server-to-server 呼叫，不受功能開關影響。一律 HTTP 200 text/plain：成功或重複通知回 1|OK；\n驗證失敗回 0|CheckMacValue Error、0|MerchantID Error、0|Order Not Found、0|Amount Mismatch；資料庫錯誤回 0|Internal Error（綠界會重送）。",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "payments"
+                ],
+                "summary": "綠界付款結果通知",
+                "responses": {
+                    "200": {
+                        "description": "1|OK 或 0|原因",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/payments/{trade_no}": {
+            "get": {
+                "description": "以交易編號查詢，只回傳 trade_no、amount、status，不含贊助者名稱與留言；不受功能開關影響",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "payments"
                 ],
-                "summary": "綠界付款 callback（未實作）",
+                "summary": "查詢付款狀態",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "交易編號（建立付款回傳的 trade_no）",
+                        "name": "trade_no",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
                 "responses": {
-                    "501": {
-                        "description": "Not Implemented",
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/service.PaymentStatusView"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Envelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/response.Envelope"
                         }
@@ -1340,8 +1446,12 @@ const docTemplate = `{
                     "description": "顯示用日期字串",
                     "type": "string"
                 },
+                "ecpay_trade_no": {
+                    "description": "綠界交易編號（TradeNo）",
+                    "type": "string"
+                },
                 "id": {
-                    "description": "贊助紀錄 id（如 d1）",
+                    "description": "贊助紀錄 id（如 d1 或綠界 MerchantTradeNo）",
                     "type": "string"
                 },
                 "name": {
@@ -1350,6 +1460,18 @@ const docTemplate = `{
                 },
                 "note": {
                     "description": "備註",
+                    "type": "string"
+                },
+                "paid_at": {
+                    "description": "付款完成時間",
+                    "type": "string"
+                },
+                "payment_type": {
+                    "description": "綠界付款方式（PaymentType）",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "pending / paid / failed",
                     "type": "string"
                 },
                 "updated_at": {
@@ -1533,6 +1655,26 @@ const docTemplate = `{
                 }
             }
         },
+        "service.CreatePaymentView": {
+            "type": "object",
+            "properties": {
+                "action_url": {
+                    "description": "綠界 AIO 付款網址",
+                    "type": "string"
+                },
+                "params": {
+                    "description": "表單欄位（含 CheckMacValue）",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "trade_no": {
+                    "description": "綠界 MerchantTradeNo，同時是贊助紀錄 id",
+                    "type": "string"
+                }
+            }
+        },
         "service.FeatureView": {
             "type": "object",
             "properties": {
@@ -1549,6 +1691,37 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "service.PaymentInput": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "description": "新台幣元，10～20000",
+                    "type": "integer"
+                },
+                "message": {
+                    "description": "想對小鴨說的話，存入 note，不送綠界",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "贊助者名稱；空白記為「匿名訪客」",
+                    "type": "string"
+                }
+            }
+        },
+        "service.PaymentStatusView": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "trade_no": {
                     "type": "string"
                 }
             }

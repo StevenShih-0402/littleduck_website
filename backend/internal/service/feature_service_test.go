@@ -93,14 +93,17 @@ func TestFeaturePublicMap_UsesDBValuesAndDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PublicMap 應成功: %v", err)
 	}
-	if len(m) != 3 {
-		t.Fatalf("應有 3 個 key，得到 %v", m)
+	if len(m) != 4 {
+		t.Fatalf("應有 4 個 key，得到 %v", m)
 	}
 	if m[FeatureGuestbook] {
 		t.Error("guestbook 應為 false（取 DB 值）")
 	}
 	if !m[FeatureSponsor] || !m[FeatureArticleComments] {
 		t.Error("DB 缺 key 應回登記表預設值 true")
+	}
+	if m[FeatureSponsorPayment] {
+		t.Error("sponsor_payment 缺 DB 列時應回預設值 false")
 	}
 }
 
@@ -141,7 +144,7 @@ func TestFeatureList_FollowsRegistryOrderWithMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List 應成功: %v", err)
 	}
-	wantKeys := []string{FeatureSponsor, FeatureGuestbook, FeatureArticleComments}
+	wantKeys := []string{FeatureSponsor, FeatureGuestbook, FeatureArticleComments, FeatureSponsorPayment}
 	if len(list) != len(wantKeys) {
 		t.Fatalf("長度應為 %d，得到 %d", len(wantKeys), len(list))
 	}
@@ -287,8 +290,8 @@ func TestFeatureEnsureDefaults_CreatesMissingOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnsureDefaults 應成功: %v", err)
 	}
-	if len(repo.created) != 2 {
-		t.Fatalf("應只補 2 個缺漏 key，得到 %v", repo.created)
+	if len(repo.created) != 3 {
+		t.Fatalf("應只補 3 個缺漏 key，得到 %v", repo.created)
 	}
 	if repo.rows[FeatureGuestbook].Enabled {
 		t.Error("既有 guestbook=false 不得被覆寫")
@@ -309,4 +312,43 @@ func TestFeatureEnsureDefaults_RepoErrorReturns500(t *testing.T) {
 
 	// Assert
 	assertFeatureAppError(t, err, http.StatusInternalServerError)
+}
+
+func TestFeatureEnsureDefaults_SponsorPaymentDefaultsOffAndKeepsSponsor(t *testing.T) {
+	// Arrange：升級前的既有資料庫——sponsor 已啟用、沒有 sponsor_payment
+	repo := newMockFeatureRepo(model.FeatureFlag{Key: FeatureSponsor, Enabled: true})
+	svc := NewFeatureService(repo)
+
+	// Act
+	err := svc.EnsureDefaults()
+
+	// Assert
+	if err != nil {
+		t.Fatalf("EnsureDefaults 應成功: %v", err)
+	}
+	if row, ok := repo.rows[FeatureSponsorPayment]; !ok || row.Enabled {
+		t.Errorf("sponsor_payment 應以停用建立，得到 %+v", row)
+	}
+	if !repo.rows[FeatureSponsor].Enabled {
+		t.Error("既有 sponsor 啟用狀態不得被改變")
+	}
+}
+
+func TestFeatureEnsureDefaults_EmptyDBCreatesSponsorPaymentOff(t *testing.T) {
+	// Arrange
+	repo := newMockFeatureRepo()
+	svc := NewFeatureService(repo)
+
+	// Act
+	if err := svc.EnsureDefaults(); err != nil {
+		t.Fatalf("EnsureDefaults 應成功: %v", err)
+	}
+
+	// Assert
+	if repo.rows[FeatureSponsorPayment] == nil || repo.rows[FeatureSponsorPayment].Enabled {
+		t.Error("空資料庫時 sponsor_payment 應為 false")
+	}
+	if !repo.rows[FeatureSponsor].Enabled || !repo.rows[FeatureGuestbook].Enabled || !repo.rows[FeatureArticleComments].Enabled {
+		t.Error("其他三個 key 應為 true")
+	}
 }

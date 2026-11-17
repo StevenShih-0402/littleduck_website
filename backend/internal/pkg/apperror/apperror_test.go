@@ -123,3 +123,19 @@ func TestFeatureDisabled_Returns403WithCode(t *testing.T) {
 		t.Errorf("Message = %q", err.Message)
 	}
 }
+
+func TestPaymentUnavailable_Returns503WithCode(t *testing.T) {
+	// Arrange & Act
+	appErr := PaymentUnavailable("付款暫時無法使用")
+
+	// Assert
+	if appErr.Code != "PAYMENT_UNAVAILABLE" {
+		t.Errorf("Code = %q", appErr.Code)
+	}
+	if appErr.Status != http.StatusServiceUnavailable {
+		t.Errorf("Status = %d, want 503", appErr.Status)
+	}
+	if appErr.Message != "付款暫時無法使用" {
+		t.Errorf("Message = %q", appErr.Message)
+	}
+}
