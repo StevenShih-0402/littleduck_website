@@ -15,9 +15,24 @@ const Kpi = ({ label, v, sub }) => (
   </div>
 );
 
+const DON_STATUS = { pending: ["待付款", "var(--a-dim)"], paid: ["已付款", "var(--a-acc)"], failed: ["付款失敗", "#d14343"] };
+
+// 贊助狀態標籤（同 status-pill 風格）
+const DonationStatus = ({ st }) => {
+  const [label, color] = DON_STATUS[st] || [st, "var(--a-dim)"];
+  return (
+    <span className="mono text-[9.5px] px-2 py-0.5 border a-line inline-flex items-center gap-1.5 shrink-0" style={{ borderRadius: "var(--a-rad)" }}>
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }}></span>
+      {label}
+    </span>
+  );
+};
+
 export default function AdminSponsor() {
   const { db, updateSettings } = useLake();
-  const dons = db.donations || [];
+  const allDons = db.donations || [];
+  // SDP-104：KPI 只計已付款；舊資料沒有 status 欄位時視為 paid
+  const dons = allDons.filter(x => (x.status || "paid") === "paid");
   // 贊助視窗設定以本機表單狀態編輯，按「儲存設定」才 PUT /settings
   const [sp, setSp] = React.useState((db.settings && db.settings.sponsor) || { title: "", subtitle: "", tiers: [] });
   // settings 重新載入後同步表單：在 render 期間比對前一次的值，取代「effect 內 setState」
@@ -101,14 +116,15 @@ export default function AdminSponsor() {
         <div className="a-panel p-5 col-span-12 lg:col-span-6">
           <div className="ntc font-black text-[14px] mb-3">贊助紀錄</div>
           <div className="space-y-2 max-h-[380px] overflow-y-auto">
-            {dons.map(x => (
+            {allDons.map(x => (
               <div key={x.id} className="flex items-baseline gap-2.5 border-b a-line pb-2">
                 <span className="mono text-[10px] a-dim shrink-0">{x.date}</span>
                 <span className="ntc text-[12.5px] font-bold flex-1 truncate">{x.name}{x.note ? <span className="a-dim font-normal">「{x.note}」</span> : null}</span>
+                <DonationStatus st={x.status || "paid"} />
                 <span className="mono text-[12px] a-acc font-bold shrink-0">NT$ {x.amt}</span>
               </div>
             ))}
-            {dons.length === 0 && <div className="a-dim mono text-[11px]">尚無贊助紀錄。</div>}
+            {allDons.length === 0 && <div className="a-dim mono text-[11px]">尚無贊助紀錄。</div>}
           </div>
         </div>
       </div>

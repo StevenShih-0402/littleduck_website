@@ -111,7 +111,14 @@ export default function FrontShell({ children }) {
 
       <main className="max-w-[1100px] mx-auto px-4 sm:px-6 py-8 sm:py-10">{children}</main>
 
-      <FeatureGate flag={FEATURES.SPONSOR}>{preview => <SponsorFab preview={preview} />}</FeatureGate>
+      {/* SDP-104：贊助按鈕需 sponsor 與 sponsor_payment 兩個開關都啟用；任一層停用時管理員預覽 */}
+      <FeatureGate flag={FEATURES.SPONSOR}>
+        {outerPreview => (
+          <FeatureGate flag={FEATURES.SPONSOR_PAYMENT}>
+            {innerPreview => <SponsorFab preview={outerPreview || innerPreview} />}
+          </FeatureGate>
+        )}
+      </FeatureGate>
 
       <footer className="border-t rule-heavy mt-6" style={{ borderTopWidth: "var(--heavy)" }}>
         <div className="max-w-[1100px] mx-auto px-4 sm:px-6 py-5 flex flex-col sm:flex-row gap-2 justify-between mono text-[10.5px] uppercase tracking-[.15em] v-dim">

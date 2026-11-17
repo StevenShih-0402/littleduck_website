@@ -4,6 +4,7 @@
 /** 開關 key 常數，需與後端登記表一致 */
 export const FEATURES = Object.freeze({
   SPONSOR: "sponsor",
+  SPONSOR_PAYMENT: "sponsor_payment",
   GUESTBOOK: "guestbook",
   ARTICLE_COMMENTS: "article_comments",
 });
