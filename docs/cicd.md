@@ -81,7 +81,7 @@ docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:$PWD" -w "
 | bundle | 組部署包：compose 檔、渲染好的 Nginx 站台、主機端腳本、`image.txt` | 中止 |
 | upload | `scp` 部署包到 `/opt/littleduck-api-staging` | 中止 |
 | deploy | 主機上執行 `remote-deploy.sh`：`pull` → `up -d` → 120 秒內等 api 變成 healthy → 更新 Nginx 站台 | 逾時即失敗，印出 `docker compose ps` 與 api 記錄 |
-| smoke | 對 `https://api.staging.stevenshih-littleduck.com/health`、`/api/v1/articles` 各發一次請求（主機名來自 secret `api_staging_host`） | 任一非 2xx 即失敗 |
+| smoke | 以 Staging 帳密（secret `staging_basic_auth`）對 `https://api.staging.stevenshih-littleduck.com/health`、`/api/v1/articles` 各發一次請求（主機名來自 secret `api_staging_host`），再不帶帳密請求 `/api/v1/articles` | 帶帳密任一非 2xx、或不帶帳密不是 401（驗證未生效）即失敗 |
 | cleanup | 刪除 runner 主機上本次建出的映像 | 不論成敗都執行 |
 
 ### `cd-backend-production`（promote 到 `production` 時）
@@ -110,10 +110,21 @@ Production 不重新建置映像，直接部署 Staging 驗證過的那個 tag�
 
 Hetzner 主機的 80／443 由 mygo_v2_anon 的 Nginx 佔用。本 repo 的站台樣板在 `deploy/edge/*.conf.template`，CD 會做兩件事：
 
-1. 用 `deploy/edge/render.sh` 只帶入網域變數，產生 `littleduck-*.conf`。
+1. 用 `deploy/edge/render.sh` 只帶入網域變數（前端 Staging 另帶入通行值 `STAGING_GATE_TOKEN`），產生 `littleduck-*.conf`。
 2. 在主機上執行 `install-sites.sh`，把設定放進 `/opt/edge-sites/`。
 
-`install-sites.sh` 放設定前會先檢查憑證存在，放完跑 `nginx -t`，失敗就還原，所以不會把 mygo 的 Nginx 弄壞。憑證檢查是在 mygo 的 Nginx 容器內以 `docker exec … test -f` 進行（前置：Nginx 以相同路徑唯讀掛載 `/etc/letsencrypt`），檢查的就是 Nginx 實際讀得到的檔案，所以 `deploy` 不需要讀主機 `/etc/letsencrypt/live`、`archive`，也不需要放寬它們的權限。本機驗證可執行 `sh deploy/edge/test-install-sites.sh`（需要 Docker）。
+`install-sites.sh` 放設定前會先檢查憑證存在，放完跑 `nginx -t`，失敗就還原，所以不會把 mygo 的 Nginx 弄壞。憑證檢查是在 mygo 的 Nginx 容器內以 `docker exec … test -f` 進行（前置：Nginx 以相同路徑唯讀掛載 `/etc/letsencrypt`），檢查的就是 Nginx 實際讀得到的檔案，所以 `deploy` 不需要讀主機 `/etc/letsencrypt/live`、`archive`，也不需要放寬它們的權限。站台以 `auth_basic_user_file` 引用的帳密檔也用同樣方式在容器內檢查：缺檔時 `nginx -t` 照樣通過、但每個請求都回 500，所以缺檔就中止、不放設定。本機驗證可執行 `sh deploy/edge/test-install-sites.sh`（需要 Docker）。
+
+#### Staging 身分驗證（SDP-181）
+
+兩個 Staging 站台在 Nginx 層以 HTTP Basic Auth 擋住沒有帳密的人，Production 站台不受影響。建立帳密檔、輪替與回滾見 runbook「Staging 身分驗證」。
+
+- **帳密檔**：兩站共用主機 `/opt/edge-sites/littleduck-staging.htpasswd`（容器內 `/etc/nginx/edge-sites/littleduck-staging.htpasswd`），SHA-512 crypt 雜湊，手動建立、不進版控。檔名不是 `.conf`，不會被 `include *.conf` 載入，也不會被 `install-sites.sh` 的備份／還原動到。
+- **後端 Staging**（`api-staging.conf.template`）：全站要帳密，含 `/health`、`/swagger/`；唯一例外是綠界付款結果通知 `POST /api/v1/payments/ecpay/callback`（伺服器對伺服器，由後端 CheckMacValue 驗證）。
+- **前端 Staging 同源轉送**（`web-staging.conf.template`）：`location /api/` 轉送到 `littleduck-api-staging:8080`，主機 `.env` 的 `API_BASE_URL` 是前端 Staging 自己。理由：跨站呼叫時 CORS 預檢不帶帳密，會被 401 擋下。
+- **通行 cookie `ld_staging_gate`**：通過 Basic Auth 的回應會帶 `Set-Cookie: ld_staging_gate=<通行值>`（HttpOnly、Secure、SameSite=Strict）；之後帶正確 cookie 的請求免再驗 Basic Auth，讓帶 `Authorization: Bearer` 的管理員請求能通過（Bearer 與 Basic 共用同一個標頭）。通行值來自 secret `staging_gate_token`，`frontend-bundle.sh` 會檢查它是 32 字元以上的十六進位字串。map 用錨定正規式比對，因為 64 字元的字串鍵會超過預設 `map_hash_bucket_size`。
+- **Staging 同源、Production 跨站**：Staging 驗不到 CORS 問題。目前後端 CORS 全開所以無妨；日後收斂 CORS 白名單時，要在上 Production 前另行驗證跨站呼叫。
+- 本機驗證：`sh deploy/edge/test-staging-auth.sh`（需要 Docker 與網路），以真實樣板與假 upstream 驗證上述行為。
 
 ## CD：前端
 
@@ -129,7 +140,7 @@ Hetzner 主機的 80／443 由 mygo_v2_anon 的 Nginx 佔用。本 repo 的站�
 | bundle | 組部署包：`deploy/web/docker-compose.staging.yml`、渲染好的 Nginx 站台、主機端腳本、`image.txt` | 中止 |
 | upload | `scp` 部署包到 `/opt/littleduck-web-staging` | 中止 |
 | deploy | 主機上執行 `remote-deploy.sh … web`：`pull` → `up -d` → 120 秒內等 web 變成 healthy → 更新 Nginx 站台 | 逾時即失敗，印出 `docker compose ps` 與 web 記錄 |
-| smoke | `smoke-frontend.sh`：`/`、`/blog` 回 2xx，且 `/runtime-config.js` 含 Staging 後端位址 | 任一不符即失敗 |
+| smoke | `smoke-frontend.sh`，以 Staging 帳密（secret `staging_basic_auth`）請求：`/`、`/blog`、同源的 `/api/v1/articles` 回 2xx，且 `/runtime-config.js` 的 `apiBaseUrl` 是前端 Staging 自己（`https://staging.stevenshih-littleduck.com`）；再不帶帳密請求 `/` | 任一不符、或不帶帳密不是 401（驗證未生效）即失敗 |
 | cleanup | 刪除 runner 主機上本次建出的映像 | 不論成敗都執行 |
 
 ### `cd-frontend-production`（promote 到 `production` 時）
@@ -138,7 +149,7 @@ Hetzner 主機的 80／443 由 mygo_v2_anon 的 Nginx 佔用。本 repo 的站�
 |------|------|--------|
 | verify-build | 查該 commit 的 `continuous-integration/drone/push` 狀態，必須是 `success` | 中止，不部署 |
 | bundle／upload／deploy | 同 Staging，目錄為 `/opt/littleduck-web`，映像是同一個 `<version>-<sha>` | 同上 |
-| smoke | 對正式網域做同樣檢查，`/runtime-config.js` 須含正式後端位址 | 任一不符即失敗，需依 runbook 回滾 |
+| smoke | 對正式網域檢查 `/`、`/blog` 回 2xx，`/runtime-config.js` 須含正式後端位址（不帶帳密、不檢查 401） | 任一不符即失敗，需依 runbook 回滾 |
 
 ### 映像與站台
 
@@ -164,6 +175,8 @@ Hetzner 主機的 80／443 由 mygo_v2_anon 的 Nginx 佔用。本 repo 的站�
 | `api_staging_host` | 後端 Staging 網域 | `api.staging.stevenshih-littleduck.com` |
 | `frontend_host` | 前端 Production 網域 | `stevenshih-littleduck.com` |
 | `frontend_staging_host` | 前端 Staging 網域 | `staging.stevenshih-littleduck.com` |
+| `staging_basic_auth` | Staging 冒煙用的 Basic Auth 帳密（`cd-backend-staging`、`cd-frontend-staging` 的 smoke） | `帳號:密碼` 明文，與主機帳密檔一致 |
+| `staging_gate_token` | 前端 Staging 通行 cookie `ld_staging_gate` 的值（`cd-frontend-staging` 的 bundle） | `openssl rand -hex 32` 的輸出 |
 
 ## 各階段耗時
 

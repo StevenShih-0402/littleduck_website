@@ -1,5 +1,16 @@
 # deploy/edge/web-staging.conf.template
-# 前端 Staging 的 Nginx 站台：CD 以 envsubst 只帶入 ${FRONTEND_STAGING_HOST} 後放到主機 /opt/edge-sites/，由 mygo 的 Nginx include
+# 前端 Staging 的 Nginx 站台：CD 以 envsubst 只帶入 FRONTEND_STAGING_HOST、STAGING_GATE_TOKEN 兩個變數後放到主機 /opt/edge-sites/，由 mygo 的 Nginx include
+# Staging 需 Basic Auth（帳密檔由 runbook 手動建立）；通過後發通行 cookie，帶有效 cookie 的請求免再驗，
+# 讓帶 Authorization: Bearer 的管理員請求也能通過（Bearer 與 Basic 共用同一個標頭）。
+
+# 帶正確通行 cookie → 關閉 Basic Auth；其他 → realm 字串（要求驗證）
+# 變數名稱加站台前綴：所有站台共用同一個 http 區塊，同名 map 會讓 nginx -t 失敗
+# 用錨定的正規式比對而非字串鍵：64 字元的字串鍵超過預設 map_hash_bucket_size（64），nginx -t 會失敗；
+# 調大該值會影響共用 http 區塊的其他站台。通行值已由 frontend-bundle.sh 限定為十六進位，不含正規式特殊字元
+map $cookie_ld_staging_gate $ld_web_staging_auth {
+    "~^${STAGING_GATE_TOKEN}$" off;
+    default "littleduck staging";
+}
 
 server {
     listen 80;
@@ -21,9 +32,27 @@ server {
     ssl_certificate     /etc/letsencrypt/live/${FRONTEND_STAGING_HOST}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/${FRONTEND_STAGING_HOST}/privkey.pem;
 
+    auth_basic           $ld_web_staging_auth;
+    auth_basic_user_file /etc/nginx/edge-sites/littleduck-staging.htpasswd;
+    # 不加 always：只在 2xx／3xx 發 cookie，401 不會發。
+    # 注意：location 內若自己寫 add_header，會整個蓋掉這一行，須在該 location 重複宣告
+    add_header Set-Cookie "ld_staging_gate=${STAGING_GATE_TOKEN}; Path=/; Secure; HttpOnly; SameSite=Strict";
+
     # upstream 用 container_name（deploy/web/docker-compose.staging.yml），理由同 web.conf.template
     resolver 127.0.0.11 valid=10s;
     set $web_upstream littleduck-web-staging:3000;
+    set $api_upstream littleduck-api-staging:8080;
+
+    # 同源轉送到後端 Staging：瀏覽器跨站呼叫時 CORS 預檢不帶帳密，會被 Basic Auth 擋下
+    # proxy_pass 用不帶 URI 的變數形式，/api/v1/... 原樣送到後端
+    location /api/ {
+        client_max_body_size 5m;
+        proxy_pass http://$api_upstream;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
 
     location / {
         proxy_pass http://$web_upstream;

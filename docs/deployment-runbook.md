@@ -156,12 +156,12 @@
    sudo mkdir -p /opt/littleduck-web /opt/littleduck-web-staging && sudo chown deploy: /opt/littleduck-web*
    ```
    兩個目錄各放一份 `.env`，**只有一行**：
-   - Staging：`API_BASE_URL=https://api.staging.stevenshih-littleduck.com`
+   - Staging：`API_BASE_URL=https://staging.stevenshih-littleduck.com`（同源，經前端 Staging 站台的 `/api/` 轉送到後端 Staging，理由見第 7 節）
    - Production：`API_BASE_URL=https://api.stevenshih-littleduck.com`
 
    這個值在容器啟動時由 `/runtime-config.js` 交給瀏覽器，改了 `.env` 後 `docker compose up -d` 重建容器即可，不必重建映像。
 6. **建 Drone secret**：新增 `frontend_staging_host`（`staging.stevenshih-littleduck.com`），`frontend_host` 改成 `stevenshih-littleduck.com`；不勾 Allow Pull Requests。`deploy_ssh_key`、`hetzner_host`、`ghcr_*` 與後端共用。
-7. **第一次部署**：合併 PR 到 `main` 後 `cd-frontend-staging` 會建立 Staging，用 `smoke` 階段確認 `/runtime-config.js` 含 Staging 後端位址。Production 等第一次 promote。
+7. **第一次部署**：合併 PR 到 `main` 後 `cd-frontend-staging` 會建立 Staging，用 `smoke` 階段確認 `/runtime-config.js` 的 `apiBaseUrl` 是前端 Staging 自己。Staging 需要先完成第 7 節的帳密檔與 secret，否則部署會失敗。Production 等第一次 promote。
 8. **移除舊託管服務**：Production promote 成功、確認新站正常後，才刪除舊託管服務上的前端專案，並刪除 Drone 裡殘留的四個舊 secret（token、org id、project id、preview bypass，名稱都以該服務的名字開頭）。在那之前保留舊專案，作為整體回退的後路（把 DNS 指回去）。
 
    刪除後就無法用「把 DNS 指回去」回退，請依序做：
@@ -183,7 +183,7 @@
       drone secret ls StevenShih-0402/littleduck_website
       drone secret rm --name <舊 secret 名稱> StevenShih-0402/littleduck_website
       ```
-      目前流水線用到的 secret 只有這 8 個，其他的都可以刪：`ghcr_username`、`ghcr_token`、`hetzner_host`、`deploy_ssh_key`、`api_host`、`api_staging_host`、`frontend_host`、`frontend_staging_host`。刪完後在 `.drone.yml` 執行 `git grep -n from_secret`，確認沒有任何 pipeline 引用已刪除的名稱。
+      目前流水線用到的 secret 只有這 10 個，其他的都可以刪：`ghcr_username`、`ghcr_token`、`hetzner_host`、`deploy_ssh_key`、`api_host`、`api_staging_host`、`frontend_host`、`frontend_staging_host`、`staging_basic_auth`、`staging_gate_token`。刪完後在 `.drone.yml` 執行 `git grep -n from_secret`，確認沒有任何 pipeline 引用已刪除的名稱。
 
 ## 4. 確認 CI 會回報到 PR
 
@@ -194,8 +194,9 @@
 1. **PR 合併到 `main`**：Drone 自動跑 CI，接著跑 `cd-backend-staging` 與 `cd-frontend-staging`。
 2. **檢查 Staging**：
    - 到 Drone 的建置頁確認整個建置是綠的。
-   - 後端打 `https://api.staging.stevenshih-littleduck.com/health`。
-   - 前端開 `https://staging.stevenshih-littleduck.com`，並確認 `https://staging.stevenshih-littleduck.com/runtime-config.js` 的 `apiBaseUrl` 是 Staging 後端；`cd-frontend-staging` 的 smoke 階段已自動檢查。
+   - 兩個 Staging 都要 Basic Auth（第 7 節），以下都帶 Staging 帳密。
+   - 後端：`curl -u '<帳號>:<密碼>' https://api.staging.stevenshih-littleduck.com/health`。
+   - 前端：瀏覽器開 `https://staging.stevenshih-littleduck.com`，輸入帳密後確認頁面正常，且 `/runtime-config.js` 的 `apiBaseUrl` 是 `https://staging.stevenshih-littleduck.com`；兩條 cd-*-staging 的 smoke 階段已自動檢查，也會確認不帶帳密回 401。
 3. **promote**：在 Drone 建置頁右上角按 Deploy，Target 填 `production`。也可以用 CLI：
    ```bash
    drone build promote StevenShih-0402/littleduck_website <build 編號> production
@@ -265,3 +266,61 @@ curl -fsS https://stevenshih-littleduck.com/runtime-config.js
 | 日期 | 環境 | 內容 | 結果 |
 |------|------|------|------|
 | 2026-11-15 | 後端 Staging | `0.1.0-a2bb8cf` → `0.1.0-4e5d2e1` → 還原 `0.1.0-a2bb8cf` | 兩次切換都 healthy、`/health` 回 200，db 未重建；還原時從 GHCR 重新拉映像 |
+
+## 7. Staging 身分驗證
+
+SDP-181 起，前端 Staging（`staging.stevenshih-littleduck.com`）與後端 Staging（`api.staging.stevenshih-littleduck.com`）都要 HTTP Basic Auth，兩站共用一組帳密；Production 不受影響。機制見 [cicd.md](cicd.md#staging-身分驗證sdp-181)。
+
+| 項目 | 位置 |
+|------|------|
+| 帳密雜湊檔 | 主機 `/opt/edge-sites/littleduck-staging.htpasswd`（Nginx 容器內 `/etc/nginx/edge-sites/littleduck-staging.htpasswd`） |
+| 帳密明文（冒煙用） | Drone secret `staging_basic_auth`，值為 `帳號:密碼` |
+| 通行 cookie 值 | Drone secret `staging_gate_token`，`openssl rand -hex 32` 的輸出 |
+
+### 上線前（合併 SDP-181 的 PR 之前完成）
+
+1. **建立帳密檔**：以 `deploy` 登入主機執行。用 Nginx 映像內的 `mkpasswd` 產生 SHA-512 crypt（`$6$`）雜湊，密碼從標準輸入讀，不留在指令列與 shell 歷史：
+   ```bash
+   read -r -p '帳號：' u
+   read -r -s -p '密碼：' p; echo
+   printf '%s:%s\n' "$u" "$(printf '%s' "$p" | docker run --rm -i nginx:1.27-alpine mkpasswd -m sha512 -P 0)" \
+     > /opt/edge-sites/littleduck-staging.htpasswd
+   unset p
+   chmod 644 /opt/edge-sites/littleduck-staging.htpasswd   # 只含雜湊；Nginx worker 不是 deploy，需要可讀
+   docker exec -u nginx "$(docker ps -q --filter label=com.docker.compose.project=mygo-v2 --filter label=com.docker.compose.service=nginx)" \
+     test -r /etc/nginx/edge-sites/littleduck-staging.htpasswd && echo Nginx worker 可讀   # 以 worker 帳號檢查；root 一定讀得到，檢查無意義
+   ```
+   沒有這個檔時 `install-sites.sh` 會以「帳密檔 … 不存在，請先依 runbook 建立」中止部署。
+2. **建 Drone secret**：在 repo Settings → Secrets 新增，都**不勾** Allow Pull Requests：
+   - `staging_basic_auth`：`帳號:密碼`（與第 1 步相同）
+   - `staging_gate_token`：在本機執行 `openssl rand -hex 32` 的輸出（必須是 32 字元以上的小寫十六進位，否則 `frontend-bundle.sh` 會失敗）
+3. **改前端 Staging 的 `.env`**：把 `/opt/littleduck-web-staging/.env` 改為 `API_BASE_URL=https://staging.stevenshih-littleduck.com`。下次部署重建容器時生效，不必手動重啟。
+
+### 上線
+
+合併 PR 後，`cd-backend-staging` 與 `cd-frontend-staging` 依序部署並冒煙。兩條都跑完之前 Staging 會短暫不能用（後端站台先上了驗證，前端舊容器還在跨站呼叫 `api.staging`；或 `.env` 已改、站台還沒上 `/api/` 轉送），幾分鐘內自動恢復，只影響 Staging。
+
+上線後確認：
+
+- 兩條 cd-*-staging 的 smoke 通過。
+- 瀏覽器開前端 Staging 會跳出帳密視窗；登入後台、預覽一項功能開關，各操作正常。
+- `curl -s -o /dev/null -w '%{http_code}' https://stevenshih-littleduck.com/` 仍為 `200`（Production 不受影響）。
+
+### 輪替
+
+- **帳密**：照「上線前」第 1 步重建帳密檔（Nginx 每個請求都會讀檔，不必 reload），再更新 secret `staging_basic_auth`。瀏覽器已有的通行 cookie 仍有效，要讓所有人重新登入就一併輪替通行值。
+- **通行值**：更新 secret `staging_gate_token` 後，在 Drone 對最近一次 `main` 建置重跑 `cd-frontend-staging`（Restart）。舊 cookie 立刻失效，使用者重新輸入一次帳密即可。
+
+### 回滾
+
+1. revert SDP-181 的 PR 並合併，讓兩條 Staging pipeline 重跑，站台設定回到無驗證版本。
+2. 把 `/opt/littleduck-web-staging/.env` 改回 `API_BASE_URL=https://api.staging.stevenshih-littleduck.com`，再重跑一次 `cd-frontend-staging`。
+3. 帳密檔與兩個 secret 留著無害，確定不再用時再刪。
+
+### 已知限制
+
+- **Staging Swagger 不能試打後台端點**：在 Swagger 的「Authorize」填 Bearer 權杖後，`Authorization` 標頭會被它佔用，Basic Auth 失效而回 401。後台端點改從前端 Staging 的後台操作測，或以 curl 經前端 Staging 的 `/api/` 帶通行 cookie 打：
+  ```bash
+  curl -H 'Cookie: ld_staging_gate=<通行值>' -H 'Authorization: Bearer <JWT>' https://staging.stevenshih-littleduck.com/api/v1/...
+  ```
+- **綠界付款結果通知**（`POST https://api.staging.stevenshih-littleduck.com/api/v1/payments/ecpay/callback`）不需帳密，由後端 CheckMacValue 驗證；其餘路徑（含 `/health`、`/swagger/`）都要帳密。
