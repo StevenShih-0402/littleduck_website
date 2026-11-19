@@ -295,6 +295,8 @@ steps:
     environment:
       API_STAGING_HOST:
         from_secret: api_staging_host
+      SMOKE_BASIC_AUTH:
+        from_secret: staging_basic_auth
     commands:
       - sh deploy/ci/smoke-backend.sh "https://$$API_STAGING_HOST"
 
@@ -435,6 +437,8 @@ steps:
     environment:
       FRONTEND_STAGING_HOST:
         from_secret: frontend_staging_host
+      STAGING_GATE_TOKEN:
+        from_secret: staging_gate_token
     commands:
       - apk add -q gettext
       - sh deploy/ci/frontend-bundle.sh staging
@@ -468,10 +472,11 @@ steps:
     environment:
       FRONTEND_STAGING_HOST:
         from_secret: frontend_staging_host
-      API_STAGING_HOST:
-        from_secret: api_staging_host
+      SMOKE_BASIC_AUTH:
+        from_secret: staging_basic_auth
     commands:
-      - sh deploy/ci/smoke-frontend.sh "https://$$FRONTEND_STAGING_HOST" "https://$$API_STAGING_HOST"
+      # Staging 同源呼叫後端（經前端站台的 /api/ 轉送），預期 apiBaseUrl 就是前端 Staging 自己
+      - sh deploy/ci/smoke-frontend.sh "https://$$FRONTEND_STAGING_HOST" "https://$$FRONTEND_STAGING_HOST"
 
   - name: cleanup
     image: docker:27.5.1-cli
