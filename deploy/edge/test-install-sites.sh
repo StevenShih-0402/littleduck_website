@@ -1,6 +1,6 @@
 #!/bin/sh
 # deploy/edge/test-install-sites.sh
-# 本機驗證 install-sites.sh 的憑證檢查：以帶 mygo-v2 label 的假 Nginx 容器模擬主機，不 mock 被測腳本。
+# 本機驗證 install-sites.sh 的憑證與帳密檔檢查：以帶 mygo-v2 label 的假 Nginx 容器模擬主機，不 mock 被測腳本。
 # 用法：sh deploy/edge/test-install-sites.sh（需要本機 Docker）
 set -u
 
@@ -29,8 +29,10 @@ container=$(docker run -d \
 
 # 憑證只建立在容器內，主機上沒有同路徑檔案
 docker exec "$container" sh -c 'mkdir -p /etc/letsencrypt/live/test.example && touch /etc/letsencrypt/live/test.example/fullchain.pem /etc/letsencrypt/live/test.example/privkey.pem'
+# 帳密檔同樣只建立在容器內
+docker exec "$container" sh -c 'mkdir -p /etc/nginx/edge-sites && touch /etc/nginx/edge-sites/littleduck-staging.htpasswd'
 
-mkdir -p "$work/src-ok" "$work/src-missing" "$work/bin"
+mkdir -p "$work/src-ok" "$work/src-missing" "$work/src-auth-ok" "$work/src-auth-missing" "$work/bin"
 cat > "$work/src-ok/littleduck-test.conf" <<'CONF'
 # test
 # ssl_certificate /etc/letsencrypt/live/test.example/fullchain.pem;
@@ -38,6 +40,14 @@ cat > "$work/src-ok/littleduck-test.conf" <<'CONF'
 CONF
 cat > "$work/src-missing/littleduck-test.conf" <<'CONF'
 # ssl_certificate /etc/letsencrypt/live/missing.example/fullchain.pem;
+CONF
+cat > "$work/src-auth-ok/littleduck-test.conf" <<'CONF'
+# ssl_certificate /etc/letsencrypt/live/test.example/fullchain.pem;
+# auth_basic_user_file /etc/nginx/edge-sites/littleduck-staging.htpasswd;
+CONF
+cat > "$work/src-auth-missing/littleduck-test.conf" <<'CONF'
+# ssl_certificate /etc/letsencrypt/live/test.example/fullchain.pem;
+# auth_basic_user_file /etc/nginx/edge-sites/missing.htpasswd;
 CONF
 
 real_docker=$(command -v docker)
@@ -80,7 +90,27 @@ else
     failc "憑證不存在" "rc=$rc"
 fi
 
-# 案例 3：無法檢查（容器已停止；須放最後，會停掉假容器）
+# 案例 3：帳密檔存在
+sites=$(new_sites)
+out=$(EDGE_SITES_DIR="$sites" sh "$script" "$work/src-auth-ok" 2>&1); rc=$?
+echo "$out"
+if [ $rc -eq 0 ] && echo "$out" | grep -q '站台設定已更新並 reload' && [ -f "$sites/littleduck-test.conf" ]; then
+    pass "帳密檔存在"
+else
+    failc "帳密檔存在" "rc=$rc"
+fi
+
+# 案例 4：帳密檔不存在
+sites=$(new_sites)
+out=$(EDGE_SITES_DIR="$sites" sh "$script" "$work/src-auth-missing" 2>&1); rc=$?
+echo "$out"
+if [ $rc -ne 0 ] && echo "$out" | grep -q '請先依 runbook 建立' && [ -z "$(ls -A "$sites")" ]; then
+    pass "帳密檔不存在"
+else
+    failc "帳密檔不存在" "rc=$rc"
+fi
+
+# 案例 5：無法檢查（容器已停止；須放最後，會停掉假容器）
 sites=$(new_sites)
 out=$(PATH="$work/bin:$PATH" EDGE_SITES_DIR="$sites" sh "$script" "$work/src-ok" 2>&1); rc=$?
 echo "$out"
