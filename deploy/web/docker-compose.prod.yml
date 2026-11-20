@@ -1,5 +1,5 @@
 # deploy/web/docker-compose.prod.yml
-# 前端 Production：Next.js standalone 映像，由 Drone CD 同步到 Hetzner 主機的 /opt/littleduck-web 後以 GHCR 映像啟動
+# 前端 Production：Next.js standalone 映像，由 CD（Woodpecker）同步到 Hetzner 主機的 /opt/littleduck-web 後以 GHCR 映像啟動
 
 # 主機前置（見 docs/deployment-runbook.md「前端主機初次建置」）：
 #   - 同目錄放好 .env（只需 API_BASE_URL=<後端正式主機名的 https 位址>）

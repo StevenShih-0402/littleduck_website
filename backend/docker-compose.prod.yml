@@ -1,5 +1,5 @@
 # backend/docker-compose.prod.yml
-# 後端 Production：api＋PostgreSQL 16，由 Drone CD 同步到 Hetzner 主機的 /opt/littleduck-api 後以 GHCR 映像啟動
+# 後端 Production：api＋PostgreSQL 16，由 CD（Woodpecker）同步到 Hetzner 主機的 /opt/littleduck-api 後以 GHCR 映像啟動
 
 # 主機前置（見 docs/deployment-runbook.md「後端主機初次建置」）：
 #   - 同目錄放好 .env（欄位見 backend/.env.example，GIN_MODE=release；DB_HOST 由本檔指定，不必填）

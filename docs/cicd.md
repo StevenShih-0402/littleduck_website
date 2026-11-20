@@ -1,21 +1,42 @@
 # CI/CD 流水線
 
-本 repo 以自架的 [Drone](https://docs.drone.io/) 跑 CI 與 CD，設定在根目錄的 `.drone.yml`。CI 與 CD 是不同的 pipeline：CI 只做檢查，不推映像也不部署；CD 只在 `main` 收到推送或人工 promote 時執行。流程骨架參考 mygo_v2_anon 的 Jenkins 流水線。
+本 repo 以自架的 [Woodpecker CI](https://woodpecker-ci.org/)（v3.20.1）跑 CI 與 CD，設定在根目錄的 `.woodpecker/`，一個檔案就是一個 workflow。CI 與 CD 是不同的 workflow：CI 只在 PR 上做檢查，不推映像也不部署；CD 在 `main` 收到推送時部署 Staging，在 user 按 Deploy 時部署 Production。流程骨架參考 mygo_v2_anon 的 Jenkins 流水線。
+
+SDP-183 起由 Drone 換成 Woodpecker，同時簡化流程：
+
+```
+PR → CI（ci-backend、ci-frontend）→ /ship-issue 的其餘檢查 → 合併到 main
+main 推送 → CD Staging（建映像 → Trivy → 推 GHCR → 部署 → 冒煙）→ 人工在 Staging 確認 → Deploy production → CD Production
+```
 
 主機與帳號的初次設定、日常發布與回滾的操作步驟見 [deployment-runbook.md](deployment-runbook.md)。
 
 ## 觸發規則
 
-| pipeline | 觸發 | 前置 |
-|----------|------|------|
-| `ci-backend` | PR 開啟／更新（目標 `main`）、推送到 `main` | — |
-| `ci-frontend` | 同上 | — |
-| `cd-backend-staging` | 推送到 `main` | 同一次建置的 `ci-backend` 通過 |
-| `cd-frontend-staging` | 推送到 `main` | 同一次建置的 `ci-frontend` 通過 |
-| `cd-backend-production` | promote 到 `production` | 該 commit 的 push 建置全部通過 |
-| `cd-frontend-production` | promote 到 `production` | 同上 |
+| workflow | 觸發 | 前置 | GitHub status context |
+|----------|------|------|-----------------------|
+| `ci-backend` | PR 開啟／更新（目標 `main`） | — | `ci/woodpecker/pr/ci-backend` |
+| `ci-frontend` | 同上 | — | `ci/woodpecker/pr/ci-frontend` |
+| `cd-backend-staging` | 推送到 `main` | 無（不等 CI，見下方「為什麼 push 不重跑 CI」） | `ci/woodpecker/push/cd-backend-staging` |
+| `cd-frontend-staging` | 推送到 `main` | 同上 | `ci/woodpecker/push/cd-frontend-staging` |
+| `cd-backend-production` | Deploy，Target 為 `production` | 該 commit 的 `ci/woodpecker/push/*` 全部成功 | `ci/woodpecker/deployment/cd-backend-production` |
+| `cd-frontend-production` | 同上 | 同上 | `ci/woodpecker/deployment/cd-frontend-production` |
 
-每個 pipeline 的結果以 GitHub commit status 回報。PR 上會看到 `continuous-integration/drone/pr`，`gh pr checks` 也讀得到；agent-team 的 `/ship-issue` 在「PR 中」第一步就是等這個 check。
+- 每個 workflow 各自以 GitHub commit status 回報。PR 上會看到 `ci/woodpecker/pr/ci-backend` 與 `ci/woodpecker/pr/ci-frontend` 兩個 check，`gh pr checks` 也讀得到；agent-team 的 `/ship-issue` 在「PR 中」第一步就是等這兩個 check。GitHub branch protection 把這兩個設為必要 check（runbook「GitHub branch protection」）。
+- agent 的 `WOODPECKER_MAX_WORKFLOWS` 是 1，同一個 pipeline 的 workflow 依序執行。
+- 本 repo 在 Woodpecker 的 Trusted 只開 **volumes**（步驟掛主機 docker.sock 與 Trivy 快取），Require approval 為 **forks**（fork 來的 PR 要擁有者核准才跑）。部署用 secret 只開 `push`、`deployment` 事件，PR 拿不到。
+- YAML 內的 shell 變數寫成 `$$VAR`，避免被 Woodpecker 的變數替換吃掉。
+
+### 為什麼 push 不重跑 CI
+
+`main` 的品質由兩道關卡保證，所以推送到 `main` 時直接進 CD，不再對同一份程式重跑整套 CI：
+
+1. **GitHub branch protection**：`main` 要求 PR、要求 `ci/woodpecker/pr/ci-backend` 與 `ci/woodpecker/pr/ci-frontend` 通過、要求分支是最新（Require branches to be up to date）、禁止 force push。分支是最新且 CI 通過時，`--merge` 產生的 merge commit 樹與 PR head 相同，push 時重跑 CI 不會多驗到任何東西。
+2. **`/ship-issue` 的合併隊列**：rebase 到最新 `main` 後重跑 PR CI，全綠才合併。
+
+即使有人繞過保護，CD Staging 的 `docker build` 本身會編譯（Go 的 `go build`、前端的 `next build`），接著 Trivy 會再掃要上線的映像，無法建置或有高風險弱點的程式上不了 Staging。Production 還要人工 Deploy。
+
+這樣每個 commit 的映像只建 2 次（PR CI 驗 Dockerfile、CD 產出上線映像），Drone 時期是 3 次（PR CI、push CI、CD）。
 
 ## CI
 
@@ -28,11 +49,12 @@
 | wait-postgres | 等臨時 PostgreSQL 16 service 就緒（30 秒上限） | 中止 |
 | go-test | `go test ./...`，`DB_*` 指向臨時 PostgreSQL | 任一測試失敗即中止 |
 | gosec | `gosec -quiet -exclude-generated ./...`（對應 mygo 的 Bandit） | 有任何 finding 即中止 |
-| docker-build | `docker build -t littleduck-api:ci-<build> backend` | 中止 |
+| docker-build | `docker build -t littleduck-api:ci-<pipeline 編號> backend` | 中止 |
 | trivy | `trivy image --severity CRITICAL,HIGH --exit-code 1 --ignorefile backend/.trivyignore` | 有未登記的 CRITICAL／HIGH 即中止 |
 | cleanup | 刪除本次建出的映像 | 不論成敗都執行 |
 
-臨時 PostgreSQL 是 Drone 的 `services`，建置結束後自動移除。
+- 臨時 PostgreSQL 是 Woodpecker 的 `services`，workflow 結束後自動移除。
+- go-vet、go-test、gosec 以 `GOMODCACHE=$CI_WORKSPACE/.gomodcache` 共用模組快取（同一個 workflow 的步驟共用 workspace）。
 
 ### 前端（`ci-frontend`）
 
@@ -42,11 +64,12 @@
 | lint | `npm run lint`（ESLint，`eslint-config-next/core-web-vitals`） | 有 error 等級的違規即中止；warning 不擋 |
 | typecheck | `npm run typecheck`（`tsc --noEmit`，以 `jsconfig.json` 的 `checkJs` 檢查 JS） | 有型別錯誤即中止 |
 | test-design | `npm run test:design` | 中止 |
-| build | `npm run build` | 中止 |
 | audit | `npm audit --audit-level=high` | 有 high 以上弱點即中止 |
-| docker-build | `docker build -t littleduck-web:ci-<build> frontend` | 中止 |
+| docker-build | `docker build -t littleduck-web:ci-<pipeline 編號> frontend`（Dockerfile 內執行 `npm ci` 與 `next build`） | 中止 |
 | trivy | `trivy image --severity CRITICAL,HIGH --exit-code 1 --ignorefile frontend/.trivyignore` | 有未登記的 CRITICAL／HIGH 即中止 |
 | cleanup | 刪除本次建出的映像 | 不論成敗都執行 |
+
+沒有獨立的 `npm run build` 階段：正式建置在 docker-build 內的 `next build` 進行，原本兩者各跑一次 `next build`。lint 與 typecheck 仍排在建置之前。本機檢查（CLAUDE.md「檢查指令」）仍要跑 `npm run build`。
 
 ### 弱點例外登記
 
@@ -55,19 +78,21 @@
 
 ### 在本機跑 CI
 
-用 drone CLI 的容器版即可，不必安裝 CLI。repo 要用相同的絕對路徑掛進去，因為建置容器是由主機的 docker 建立的：
+用 woodpecker-cli 的容器版即可，不必安裝 CLI。repo 要用相同的絕對路徑掛進去，因為建置容器是由主機的 docker 建立的；CLI 容器不是 root，要加入 docker.sock 的群組：
 
 ```bash
-docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:$PWD" -w "$PWD" \
-  drone/cli:1.8.0 exec --trusted --pipeline ci-backend --branch main --event push .drone.yml
+docker run --rm --group-add "$(stat -c %g /var/run/docker.sock)" \
+  -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:$PWD" -w "$PWD" \
+  woodpeckerci/woodpecker-cli:v3.20.1 exec --repo-trusted-volumes --pipeline-event pull_request .woodpecker/ci-backend.yaml
 ```
 
-`--pipeline` 換成 `ci-frontend` 即可跑前端。注意：
+檔名換成 `.woodpecker/ci-frontend.yaml` 即可跑前端。語法檢查用 `docker run --rm -v "$PWD:$PWD" -w "$PWD" woodpeckerci/woodpecker-cli:v3.20.1 lint .woodpecker/`。注意：
 
-- 建置容器以 root 身分寫入工作目錄，跑完前端後要把擁有者改回來：
-  `docker run --rm -v "$PWD:/w" alpine:3.21 chown -R "$(id -u):$(id -g)" /w/frontend/node_modules /w/frontend/.next`
-- Trivy 快取會建立在本機的 `/var/cache/drone-trivy`（root 擁有），不需要時以 `docker run --rm -v /var/cache:/c alpine:3.21 rm -rf /c/drone-trivy` 刪除。
-- CD pipeline 需要 secret 與主機，不能在本機 exec。
+- 建置容器以 root 身分寫入工作目錄，跑完後要把擁有者改回來（`.gomodcache` 已列入 `.gitignore`）：
+  `docker run --rm -v "$PWD:/w" alpine:3.21 chown -R "$(id -u):$(id -g)" /w/.gomodcache /w/frontend/node_modules`
+  不再需要時以 `docker run --rm -v "$PWD:/w" alpine:3.21 rm -rf /w/.gomodcache` 刪除模組快取。
+- Trivy 快取會建立在本機的 `/var/cache/woodpecker-trivy`（root 擁有），不需要時以 `docker run --rm -v /var/cache:/c alpine:3.21 rm -rf /c/woodpecker-trivy` 刪除。
+- CD workflow 需要 secret 與主機，不能在本機 exec。
 
 ## CD：後端
 
@@ -82,17 +107,35 @@ docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:$PWD" -w "
 | upload | `scp` 部署包到 `/opt/littleduck-api-staging` | 中止 |
 | deploy | 主機上執行 `remote-deploy.sh`：`pull` → `up -d` → 120 秒內等 api 變成 healthy → 更新 Nginx 站台 | 逾時即失敗，印出 `docker compose ps` 與 api 記錄 |
 | smoke | 以 Staging 帳密（secret `staging_basic_auth`）對 `https://api.staging.stevenshih-littleduck.com/health`、`/api/v1/articles` 各發一次請求（主機名來自 secret `api_staging_host`），再不帶帳密請求 `/api/v1/articles` | 帶帳密任一非 2xx、或不帶帳密不是 401（驗證未生效）即失敗 |
-| cleanup | 刪除 runner 主機上本次建出的映像 | 不論成敗都執行 |
+| cleanup | 刪除 agent 主機上本次建出的映像 | 不論成敗都執行 |
 
-### `cd-backend-production`（promote 到 `production` 時）
+CD Staging 的 Trivy 不省略：CD 建出的是另一個映像，base image 可能已經更新，而它才是要上線的東西。
+
+### `cd-backend-production`（Deploy 到 `production` 時）
 
 | 階段 | 內容 | 失敗時 |
 |------|------|--------|
-| verify-build | 查該 commit 的 `continuous-integration/drone/push` 狀態，必須是 `success` | 中止，不部署 |
+| verify-build | `verify-commit-status.sh`：該 commit 所有 `ci/woodpecker/push/*` status 都是 `success`，且至少有 `cd-backend-staging` 與 `cd-frontend-staging` 兩個 | 中止，不部署，列出不符的 context |
 | bundle／upload／deploy | 同 Staging，目錄為 `/opt/littleduck-api`，映像是同一個 `<version>-<sha>` | 同上 |
 | smoke | 對 `https://api.stevenshih-littleduck.com/health`、`/api/v1/articles`（主機名來自 secret `api_host`） | 任一非 2xx 即失敗，需依 runbook 回滾 |
 
 Production 不重新建置映像，直接部署 Staging 驗證過的那個 tag。
+
+### Deploy（人工核准）
+
+Staging 確認後，user 以 Woodpecker 的 deployment 事件核准 Production，取代 Drone 的 promote：
+
+- **UI**：到 Woodpecker 該 commit 的 push pipeline 頁，按 **Deploy**，Target 填 `production`，Task 留空。按鈕只出現在成功的 pipeline 上，repo 設定要開啟 Allow deployments。
+- **CLI**：
+  ```bash
+  woodpecker-cli pipeline deploy --branch main StevenShih-0402/littleduck_website <pipeline 編號|last> production
+  ```
+  `last` 會選 `main` 上最近一次成功的 push pipeline。
+
+兩者都會建立一個新的 pipeline（事件 `deployment`，`CI_PIPELINE_DEPLOY_TARGET=production`），跑 `cd-backend-production` 與 `cd-frontend-production`。
+
+- **Target 打錯**（例如 `prod`）：兩個 Production workflow 都以 `evaluate: 'CI_PIPELINE_DEPLOY_TARGET == "production"'` 過濾，不會執行，部署不會發生。Woodpecker 對這種沒有符合任何 workflow 的 pipeline 怎麼顯示（略過或錯誤），合併後實機確認時補在這裡。
+- **為什麼還要 verify-build**：Woodpecker 的 Deploy API（`POST /repos/{id}/pipelines/{n}?event=deployment`）不檢查原 pipeline 是否成功，所以由 `verify-build` 補上「只有 Staging 驗過的 commit 能上 Production」。必要的 context 清單在 `deploy/ci/verify-commit-status.sh` 的 `REQUIRED_CONTEXTS` 預設值；**新增 push 觸發的 workflow 時要同步這份清單**。本機測試：`sh deploy/ci/test-verify-commit-status.sh`（需要 python3、curl、jq）。
 
 ### 映像 tag
 
@@ -104,7 +147,7 @@ Production 不重新建置映像，直接部署 Staging 驗證過的那個 tag�
 
 - 映像位置：`ghcr.io/stevenshih-0402/littleduck-api`
 - `<version>` 取自 `backend/cmd/server/main.go` 的 `@version` 註解，與 Swagger 顯示的版本一致。
-- 部署腳本在 `deploy/ci/`：`image-ref.sh` 產生不可變 tag，`remote-deploy.sh` 在主機上執行。
+- 部署腳本在 `deploy/ci/`：`image-ref.sh` 產生不可變 tag（commit sha 讀 `CI_COMMIT_SHA`），`remote-deploy.sh` 在主機上執行。
 
 ### Nginx 站台
 
@@ -128,7 +171,7 @@ Hetzner 主機的 80／443 由 mygo_v2_anon 的 Nginx 佔用。本 repo 的站�
 
 ## CD：前端
 
-前端與後端同一套模型：Drone 建置一個 Next.js standalone 映像，推到 GHCR，部署到 Hetzner 主機；Staging 驗證後，Production 直接部署同一個映像，不重新建置。API 位址不寫進映像，由主機 `.env` 的 `API_BASE_URL` 在執行期經 `/runtime-config.js` 交給瀏覽器，所以同一個映像在 Staging 打 Staging 後端、在 Production 打正式後端。
+前端與後端同一套模型：Woodpecker 建置一個 Next.js standalone 映像，推到 GHCR，部署到 Hetzner 主機；Staging 驗證後，Production 直接部署同一個映像，不重新建置。API 位址不寫進映像，由主機 `.env` 的 `API_BASE_URL` 在執行期經 `/runtime-config.js` 交給瀏覽器，所以同一個映像在 Staging 打 Staging 後端、在 Production 打正式後端。
 
 ### `cd-frontend-staging`（推送到 `main` 時）
 
@@ -141,13 +184,13 @@ Hetzner 主機的 80／443 由 mygo_v2_anon 的 Nginx 佔用。本 repo 的站�
 | upload | `scp` 部署包到 `/opt/littleduck-web-staging` | 中止 |
 | deploy | 主機上執行 `remote-deploy.sh … web`：`pull` → `up -d` → 120 秒內等 web 變成 healthy → 更新 Nginx 站台 | 逾時即失敗，印出 `docker compose ps` 與 web 記錄 |
 | smoke | `smoke-frontend.sh`，以 Staging 帳密（secret `staging_basic_auth`）請求：`/`、`/blog`、同源的 `/api/v1/articles` 回 2xx，且 `/runtime-config.js` 的 `apiBaseUrl` 是前端 Staging 自己（`https://staging.stevenshih-littleduck.com`）；再不帶帳密請求 `/` | 任一不符、或不帶帳密不是 401（驗證未生效）即失敗 |
-| cleanup | 刪除 runner 主機上本次建出的映像 | 不論成敗都執行 |
+| cleanup | 刪除 agent 主機上本次建出的映像 | 不論成敗都執行 |
 
-### `cd-frontend-production`（promote 到 `production` 時）
+### `cd-frontend-production`（Deploy 到 `production` 時）
 
 | 階段 | 內容 | 失敗時 |
 |------|------|--------|
-| verify-build | 查該 commit 的 `continuous-integration/drone/push` 狀態，必須是 `success` | 中止，不部署 |
+| verify-build | 同後端：該 commit 所有 `ci/woodpecker/push/*` 都是 `success`，且兩個 `cd-*-staging` 都在 | 中止，不部署 |
 | bundle／upload／deploy | 同 Staging，目錄為 `/opt/littleduck-web`，映像是同一個 `<version>-<sha>` | 同上 |
 | smoke | 對正式網域檢查 `/`、`/blog` 回 2xx，`/runtime-config.js` 須含正式後端位址（不帶帳密、不檢查 401） | 任一不符即失敗，需依 runbook 回滾 |
 
@@ -160,36 +203,45 @@ Hetzner 主機的 80／443 由 mygo_v2_anon 的 Nginx 佔用。本 repo 的站�
 
 ### 回滾
 
-與後端相同：在主機上把部署目錄的 `image.txt` 換成前一個 `<version>-<sha>` 後重新 `docker compose up -d`，或在 Drone 對前一個良好建置重新 promote。步驟見 runbook。
+與後端相同：在 Woodpecker 對前一個良好的 push pipeline 再按一次 Deploy 到 `production`，或在主機上把部署目錄的 `image.txt` 換成前一個 `<version>-<sha>` 後重新 `docker compose up -d`。步驟見 runbook。
 
 ## Secret 清單
 
-在 Drone 的 repo 設定 → Secrets 建立。全部**不要勾** Allow Pull Requests，這樣 PR 建置拿不到。
+在 Woodpecker 的 repo 設定 → Secrets 建立，或用 `woodpecker-cli repo secret add`。**不要**開放 `pull_request` 事件，這樣 PR 建置拿不到。事件依實際用途收窄：Production 的 host 只給 `deployment`，Staging 的 host 只給 `push`。`hetzner_host`、`deploy_ssh_key` 另限定在 `appleboy/drone-scp`、`appleboy/drone-ssh` 兩個 plugin，`commands` 步驟讀不到。
 
-| secret | 用途 | 值 |
-|--------|------|----|
-| `ghcr_username`、`ghcr_token` | 推送 GHCR（PAT 需 `write:packages`） | GitHub 帳號與具 `write:packages` 的 PAT |
-| `hetzner_host` | Hetzner 主機 IP | 主機 IP，不寫進 repo |
-| `deploy_ssh_key` | `deploy` 帳號的 `drone-deploy` 私鑰 | runbook 第 2 節產生的私鑰內容 |
-| `api_host` | 後端 Production 網域 | `api.stevenshih-littleduck.com` |
-| `api_staging_host` | 後端 Staging 網域 | `api.staging.stevenshih-littleduck.com` |
-| `frontend_host` | 前端 Production 網域 | `stevenshih-littleduck.com` |
-| `frontend_staging_host` | 前端 Staging 網域 | `staging.stevenshih-littleduck.com` |
-| `staging_basic_auth` | Staging 冒煙用的 Basic Auth 帳密（`cd-backend-staging`、`cd-frontend-staging` 的 smoke） | `帳號:密碼` 明文，與主機帳密檔一致 |
-| `staging_gate_token` | 前端 Staging 通行 cookie `ld_staging_gate` 的值（`cd-frontend-staging` 的 bundle） | `openssl rand -hex 32` 的輸出 |
+| secret | 用途 | 值 | 事件 | 限定映像 |
+|--------|------|----|------|----------|
+| `ghcr_username`、`ghcr_token` | 推送 GHCR | GitHub 帳號與具 `write:packages` 的 PAT（建議另發一把給 Woodpecker） | push | — |
+| `hetzner_host` | Hetzner 主機 IP | 主機 IP，不寫進 repo | push、deployment | `appleboy/drone-scp`、`appleboy/drone-ssh` |
+| `deploy_ssh_key` | `deploy` 帳號的 `ci_deploy` 私鑰 | runbook 第 2 節產生的私鑰內容 | push、deployment | `appleboy/drone-scp`、`appleboy/drone-ssh` |
+| `api_host` | 後端 Production 網域 | `api.stevenshih-littleduck.com` | deployment | — |
+| `api_staging_host` | 後端 Staging 網域 | `api.staging.stevenshih-littleduck.com` | push | — |
+| `frontend_host` | 前端 Production 網域 | `stevenshih-littleduck.com` | deployment | — |
+| `frontend_staging_host` | 前端 Staging 網域 | `staging.stevenshih-littleduck.com` | push | — |
+| `staging_basic_auth` | Staging 冒煙用的 Basic Auth 帳密（`cd-backend-staging`、`cd-frontend-staging` 的 smoke） | `帳號:密碼` 明文，與主機帳密檔一致 | push | — |
+| `staging_gate_token` | 前端 Staging 通行 cookie `ld_staging_gate` 的值（`cd-frontend-staging` 的 bundle） | `openssl rand -hex 32` 的輸出 | push | — |
+
+共 10 個。建立範例（`WOODPECKER_SERVER`、`WOODPECKER_TOKEN` 的設定見 runbook 第 1 節）：
+
+```bash
+R=StevenShih-0402/littleduck_website
+woodpecker-cli repo secret add --repository $R --name api_staging_host --value api.staging.stevenshih-littleduck.com --event push
+woodpecker-cli repo secret add --repository $R --name deploy_ssh_key --value @"$HOME/.ssh/ci_deploy" \
+  --event push --event deployment --image appleboy/drone-scp --image appleboy/drone-ssh
+woodpecker-cli repo secret ls --repository $R
+```
+
+`--value @<檔案>` 從檔案讀值，密碼類的值也用這個方式，避免留在 shell 歷史。
 
 ## 各階段耗時
 
-由 user 實機量測（對應 SDP-113 tasks 6.1）。
+由 user 實機量測。Woodpecker 的數字在合併 SDP-183 後重新量測（Workflow follow-up），量完以新表取代下表。
 
 | 階段 | 起點→終點 | 耗時 | 量測日期 |
 |------|-----------|------|----------|
-| PR CI | PR 開啟 → `continuous-integration/drone/pr` 成功 | 7 分 16 秒（快取未建立的第一次約 12 分 05 秒） | 2026-11-15 |
-| 後端＋前端 Staging | 合併 → push 建置成功（含 `ci-*` 與兩個 `cd-*-staging`） | 8 分 15 秒 | 2026-11-15 |
-| 後端 Production | promote → `cd-backend-production` 完成 | 17–22 秒 | 2026-11-15 |
-| 前端 Production | promote → `cd-frontend-production` 完成 | 20–21 秒 | 2026-11-15 |
-| 全程 | PR 開啟 → Production 冒煙通過 | 22 分（機器執行約 16 分 10 秒，其餘是等人合併與 promote） | 2026-11-15 |
+| PR CI | PR 開啟 → 兩個 `ci/woodpecker/pr/*` 成功 | 待量測 | — |
+| 後端＋前端 Staging | 合併 → 兩個 `cd-*-staging` 成功 | 待量測 | — |
+| Production | Deploy → 兩個 `cd-*-production` 完成 | 待量測 | — |
+| 全程 | PR 開啟 → Production 冒煙通過 | 待量測 | — |
 
-- runner 的 `DRONE_RUNNER_CAPACITY` 是 1，同一次建置的 pipeline 依序執行，所以 PR CI 是兩個 CI pipeline 相加。合併到 `main` 的建置還要再排 `cd-*-staging`，比 PR CI 更久。
-- 數字取自 PR #16（13:03:09 開 PR → 13:10:25 CI 成功 → 13:10:43 合併 → 13:18:58 Staging 完成 → 13:24:30 promote → 13:25:09 Production 完成，UTC）。GitHub 只回報整個建置的狀態，所以後端與前端 Staging 合併計算。
-- Production 不重新建置映像，只做部署與冒煙，所以只要二十幾秒。
+對照（Drone，2026-11-15，PR #16）：PR CI 7 分 16 秒；合併後的 push 建置（兩條 CI 加兩條 Staging）8 分 15 秒；兩條 Production 各約 20 秒；全程 22 分（機器執行約 16 分 10 秒）。Woodpecker 的 push 建置少了兩條 CI，PR CI 少一次 `next build`。

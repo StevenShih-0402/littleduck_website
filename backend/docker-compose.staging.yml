@@ -1,5 +1,5 @@
 # backend/docker-compose.staging.yml
-# 後端 Staging：api＋PostgreSQL 16，由 Drone CD 同步到 Hetzner 主機的 /opt/littleduck-api-staging 後以 GHCR 映像啟動
+# 後端 Staging：api＋PostgreSQL 16，由 CD（Woodpecker）同步到 Hetzner 主機的 /opt/littleduck-api-staging 後以 GHCR 映像啟動
 
 # 與 Production（docker-compose.prod.yml）完全獨立：不同的 project、容器名、資料庫 volume 與 .env，
 # 敏感值不可與 Production 共用。資源上限比 Production 低，避免排擠同主機上的線上服務。
