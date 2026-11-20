@@ -1,0 +1,63 @@
+# deploy/woodpecker/docker-compose.yml
+# Woodpecker CI server 與 agent：部署在 Hetzner CX23 的 /opt/woodpecker，由 mygo 的 Nginx 經 mygo-edge 網路反向代理
+
+# 主機前置（見 docs/deployment-runbook.md「Woodpecker 初次建置」）：
+#   - 外部網路 mygo-edge 已存在（mygo_v2_anon 建立）
+#   - 同目錄放好 .env（範本為 .env.example）
+# server 不對外開埠，只在 mygo-edge 上以 container_name 供 Nginx 連線；agent 只在本 project 的
+# default 網路上以 gRPC（9000 埠）連 server，不加入 mygo-edge。
+
+name: littleduck-woodpecker
+
+services:
+  woodpecker-server:
+    image: woodpeckerci/woodpecker-server:v3.20.1
+    # Nginx 以 container_name 解析 upstream，名稱不可與 mygo 的容器重複
+    container_name: littleduck-woodpecker-server
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # 未在 .env 設定 WOODPECKER_OPEN 時一律關閉註冊，只允許 WOODPECKER_ADMIN 列出的帳號登入
+      WOODPECKER_OPEN: ${WOODPECKER_OPEN:-false}
+    volumes:
+      # SQLite 資料庫（使用者、repo 設定、secret、建置記錄）
+      - woodpecker_data:/var/lib/woodpecker
+    networks:
+      - default
+      - mygo-edge
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+  woodpecker-agent:
+    image: woodpeckerci/woodpecker-agent:v3.20.1
+    container_name: littleduck-woodpecker-agent
+    restart: unless-stopped
+    depends_on:
+      - woodpecker-server
+    environment:
+      WOODPECKER_SERVER: woodpecker-server:9000
+      WOODPECKER_AGENT_SECRET: ${WOODPECKER_AGENT_SECRET:?WOODPECKER_AGENT_SECRET 未設定}
+      WOODPECKER_HOSTNAME: hetzner-cx23
+      # 同時只跑一個 workflow，避免排擠同主機上的 Production
+      WOODPECKER_MAX_WORKFLOWS: "1"
+    volumes:
+      # agent 要用主機的 docker 起建置容器；等同主機 root 權限，見 runbook 的風險說明
+      - /var/run/docker.sock:/var/run/docker.sock
+      # agent 的設定檔（註冊後的 agent id），重建容器時保留
+      - woodpecker_agent_config:/etc/woodpecker
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+
+volumes:
+  woodpecker_data:
+  woodpecker_agent_config:
+
+networks:
+  mygo-edge:
+    external: true
