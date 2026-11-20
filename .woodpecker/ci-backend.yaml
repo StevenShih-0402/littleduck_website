@@ -1,0 +1,90 @@
+# .woodpecker/ci-backend.yaml
+# 後端 CI：只在 PR（目標 main）執行，推送到 main 不重跑；階段與門檻見 docs/cicd.md
+#
+# GitHub check 名稱：ci/woodpecker/pr/ci-backend（branch protection 的必要 check）
+# 本 repo 在 Woodpecker 的 Trusted 只開 volumes（步驟掛主機 docker.sock 與 Trivy 快取）。
+# YAML 內的 shell 變數一律寫成 $$VAR，避免被 Woodpecker 的變數替換吃掉。
+
+when:
+  - event: pull_request
+    branch: main
+
+services:
+  - name: postgres
+    image: postgres:16
+    environment:
+      POSTGRES_USER: littleduck
+      POSTGRES_PASSWORD: littleduck
+      POSTGRES_DB: littleduck
+
+steps:
+  - name: gofmt
+    image: golang:1.26-alpine
+    commands:
+      - cd backend
+      - unformatted=$$(gofmt -l .)
+      - if [ -n "$$unformatted" ]; then echo "以下檔案未經 gofmt 格式化："; echo "$$unformatted"; exit 1; fi
+
+  # go-vet、go-test、gosec 共用 workspace 內的模組快取（同一個 workflow 的步驟共用 workspace）
+  - name: go-vet
+    image: golang:1.26-alpine
+    environment:
+      GOFLAGS: -modcacherw
+    commands:
+      - export GOMODCACHE="$$CI_WORKSPACE/.gomodcache"
+      - cd backend
+      - go vet ./...
+
+  - name: wait-postgres
+    image: postgres:16
+    commands:
+      - for i in $$(seq 1 30); do pg_isready -h postgres -U littleduck && exit 0; sleep 1; done; echo "PostgreSQL 30 秒內未就緒"; exit 1
+
+  - name: go-test
+    image: golang:1.26-alpine
+    environment:
+      CGO_ENABLED: "0"
+      GOFLAGS: -modcacherw
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: littleduck
+      DB_PASSWORD: littleduck
+      DB_NAME: littleduck
+      DB_SSLMODE: disable
+    commands:
+      - export GOMODCACHE="$$CI_WORKSPACE/.gomodcache"
+      - cd backend
+      - go test ./...
+
+  - name: gosec
+    image: securego/gosec:2.21.4
+    environment:
+      GOFLAGS: -modcacherw
+    commands:
+      - export GOMODCACHE="$$CI_WORKSPACE/.gomodcache"
+      - cd backend
+      - gosec -quiet -exclude-generated ./...
+
+  - name: docker-build
+    image: docker:27.5.1-cli
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    commands:
+      - docker build -t littleduck-api:ci-${CI_PIPELINE_NUMBER} backend
+
+  - name: trivy
+    image: aquasec/trivy:0.58.1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/cache/woodpecker-trivy:/root/.cache
+    commands:
+      - trivy image --quiet --severity CRITICAL,HIGH --exit-code 1 --ignorefile backend/.trivyignore littleduck-api:ci-${CI_PIPELINE_NUMBER}
+
+  - name: cleanup
+    image: docker:27.5.1-cli
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    commands:
+      - docker image rm -f littleduck-api:ci-${CI_PIPELINE_NUMBER} || true
+    when:
+      - status: [success, failure]

@@ -1,0 +1,66 @@
+# .woodpecker/ci-frontend.yaml
+# 前端 CI：只在 PR（目標 main）執行，推送到 main 不重跑；階段與門檻見 docs/cicd.md
+#
+# GitHub check 名稱：ci/woodpecker/pr/ci-frontend（branch protection 的必要 check）
+# 沒有獨立的 npm run build：正式建置由 docker-build 步驟內 Dockerfile 的 next build 負責，
+# lint 與 typecheck 仍排在它前面。
+# YAML 內的 shell 變數一律寫成 $$VAR，避免被 Woodpecker 的變數替換吃掉。
+
+when:
+  - event: pull_request
+    branch: main
+
+steps:
+  - name: install
+    image: node:24-alpine
+    commands:
+      - cd frontend
+      - npm ci
+
+  - name: lint
+    image: node:24-alpine
+    commands:
+      - cd frontend
+      - npm run lint
+
+  - name: typecheck
+    image: node:24-alpine
+    commands:
+      - cd frontend
+      - npm run typecheck
+
+  - name: test-design
+    image: node:24-alpine
+    commands:
+      - cd frontend
+      - npm run test:design
+
+  - name: audit
+    image: node:24-alpine
+    commands:
+      - cd frontend
+      - npm audit --audit-level=high
+
+  - name: docker-build
+    image: docker:27.5.1-cli
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    commands:
+      - docker build -t littleduck-web:ci-${CI_PIPELINE_NUMBER} frontend
+
+  - name: trivy
+    image: aquasec/trivy:0.58.1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/cache/woodpecker-trivy:/root/.cache
+    commands:
+      - trivy image --quiet --severity CRITICAL,HIGH --exit-code 1 --ignorefile frontend/.trivyignore littleduck-web:ci-${CI_PIPELINE_NUMBER}
+
+  - name: cleanup
+    image: docker:27.5.1-cli
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    commands:
+      - docker image rm -f littleduck-web:ci-${CI_PIPELINE_NUMBER} || true
+    when:
+      - status: [success, failure]

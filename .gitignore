@@ -11,9 +11,12 @@
 # 主機部署用的環境變數檔（範本為各目錄的 .env.example）
 deploy/**/.env
 
-# Drone CD 在工作區產生的暫存檔（見 deploy/ci/）
+# CD（Woodpecker）在工作區產生的暫存檔（見 deploy/ci/）
 /bundle/
 /.image-ref
+
+# ci-backend 的 Go 模組快取（在本機以 woodpecker-cli exec 跑 CI 時會建立在工作區）
+/.gomodcache/
 
 # agent-team：每個 issue 的 worktree 與給 Akafuku 讀的暫存 diff
 /wt/

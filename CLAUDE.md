@@ -18,7 +18,7 @@
 
 ## 檢查指令
 
-開發 Agent 與 Teshima 依這張表在各子目錄跑檢查；與 Drone CI 的 `ci-backend`、`ci-frontend` 相同。
+開發 Agent 與 Teshima 依這張表在各子目錄跑檢查；與 Woodpecker CI 的 `ci-backend`、`ci-frontend` 相同（前端「建置」在 CI 由 `docker build` 內的 `next build` 執行，本機仍要跑 `npm run build`）。
 
 | 項目 | 後端（在 `backend/` 執行） | 前端（在 `frontend/` 執行） |
 |------|------|------|
@@ -85,13 +85,13 @@
 | PR 前 | 確保正常運行：`backend/`、`frontend/` 各自的檢查指令，以及執行驗證 | Teshima「檢查」 |
 | PR 前 | 驗證測試有效性：對關鍵模組跑變異測試 | Teshima「檢查」 |
 | PR 前 | 檢查代碼品質：對照規格審需求與測試覆蓋 | Akafuku 審查模式 |
-| PR 中 | CI：等 Drone 的 `continuous-integration/drone/pr` check 通過（見 `docs/cicd.md`） | 主對話 |
+| PR 中 | CI：等 Woodpecker 的 `ci/woodpecker/pr/ci-backend`、`ci/woodpecker/pr/ci-frontend` 兩個 check 通過（見 `docs/cicd.md`） | 主對話 |
 | PR 中 | AI 審核：內建 `/code-review` | 主對話，Akafuku 評定 |
 | PR 中 | 安全審核：內建 `/security-review`（只在高風險時） | 主對話，Akafuku 評定 |
 | PR 中 | 按風險審批：低／中自動往下，高停下等 user 回覆「合併」 | 主對話 |
 | 合併時 | 合併隊列：rebase 到最新 `main`、重跑檢查與 CI，全綠才合併 | Teshima「合併」 |
 
-合併後的部署（Staging → promote → Production）由 Drone 的 CD 負責，不在本流程內，見 `docs/deployment-runbook.md`。
+合併後的部署（Staging → 在 Woodpecker 按 Deploy `production` → Production）由 Woodpecker 的 CD 負責，不在本流程內，見 `docs/deployment-runbook.md`。
 
 ## 功能開關（SDP-149）
 
@@ -108,7 +108,7 @@
 
 | 規則性質 | 放哪裡 | 誰檢查 | 何時 |
 |----------|--------|--------|------|
-| 機械性（格式、import 順序、前端 lint 規則） | 後端 `gofmt`／`go vet`、前端 ESLint `npm run lint`（CI 與 Teshima 檢查都會跑） | Teshima「檢查」、Drone CI | PR 前、PR 中 |
+| 機械性（格式、import 順序、前端 lint 規則） | 後端 `gofmt`／`go vet`、前端 ESLint `npm run lint`（CI 與 Teshima 檢查都會跑） | Teshima「檢查」、Woodpecker CI | PR 前、PR 中 |
 | 對照 OpenSpec 的需求覆蓋與測試涵蓋 | `/custom-review` | Akafuku（審查模式） | PR 前 |
 | 需要判斷的專案慣例（分層、錯誤格式、命名） | 本檔與 `backend/README.md` | 內建 `/code-review`，Akafuku（評定模式）評級 | PR 中 |
 
@@ -122,7 +122,7 @@
 
 | 類別 | 樣式 |
 |------|------|
-| CI／CD 與部署 | `.drone.yml`、`deploy/**`、`**/Dockerfile`、`backend/docker-compose*.yml` |
+| CI／CD 與部署 | `.woodpecker/**`、`deploy/**`、`**/Dockerfile`、`backend/docker-compose*.yml` |
 | 流程設定 | `.claude/hooks/**`、`.claude/agents/**` |
 | 資料表結構 | `backend/internal/model/**`、`backend/internal/database/**`（GORM AutoMigrate） |
 | 金流 | `backend/internal/service/payment/**`、`backend/internal/controller/payment_controller.go` |

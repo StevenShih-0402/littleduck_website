@@ -1,34 +1,34 @@
 # frontend-delivery Specification
 
 ## Purpose
-定義 littleduck_website 前端的持續部署：由 Drone 建置映像並部署到 Hetzner Staging，人工 promote 同一映像到 Production。
+定義 littleduck_website 前端的持續部署：由 Woodpecker 建置映像並部署到 Hetzner Staging，人工以 Deploy（目標 `production`）把同一映像送上 Production。
 
 ## Requirements
 
-### Requirement: 部署只由 Drone 觸發
-前端部署 SHALL 只由 Drone 的 CD pipeline 觸發，部署目標為 Hetzner 主機上的自架容器；repo MUST NOT 含有任何第三方託管平台（如 Vercel）的部署步驟或設定，推送 PR 分支 MUST NOT 產生任何部署。
+### Requirement: 部署只由 CI server 的 CD 觸發
+前端部署 SHALL 只由 Woodpecker 的 CD workflow 觸發，部署目標為 Hetzner 主機上的自架容器；repo MUST NOT 含有任何第三方託管平台（如 Vercel）的部署步驟或設定，推送 PR 分支 MUST NOT 產生任何部署。
 
 #### Scenario: PR 分支推送
 - **WHEN** 推送一個非 `main` 的分支或開 PR
 - **THEN** GHCR 沒有新的前端映像，Hetzner 上的前端容器沒有變動
 
 #### Scenario: repo 不含 Vercel 部署設定
-- **WHEN** 在 `.drone.yml`、`deploy/`、`docs/`、`frontend/`、根目錄 `README.md`、`.gitignore`、`CLAUDE.md` 搜尋 `vercel`（不分大小寫）
+- **WHEN** 在 `.woodpecker/`、`deploy/`、`docs/`、`frontend/`、根目錄 `README.md`、`.gitignore`、`CLAUDE.md` 搜尋 `vercel`（不分大小寫）
 - **THEN** 沒有任何結果
 
 ### Requirement: Production 需人工核准
-前端 Production 部署 MUST 只在使用者 promote 一個整體通過的建置到 `production` 時發生；Production MUST 部署與 Staging 相同的 `<version>-<git 短 sha>` 映像而不重新建置，健康後 SHALL 對正式網域 `stevenshih-littleduck.com` 跑冒煙測試。
+前端 Production 部署 MUST 只在使用者對一個整體通過的 push 建置觸發 deployment（目標 `production`）時發生；部署前 MUST 確認該 commit 所有 `ci/woodpecker/push/*` status 都是成功。Production MUST 部署與 Staging 相同的 `<version>-<git 短 sha>` 映像而不重新建置，健康後 SHALL 對正式網域 `stevenshih-littleduck.com` 跑冒煙測試。
 
 #### Scenario: 核准後部署
-- **WHEN** 使用者 promote 該建置到 `production`
+- **WHEN** 使用者在 Woodpecker 對該 push 建置按 Deploy、目標填 `production`
 - **THEN** `https://stevenshih-littleduck.com` 改跑與 Staging 相同 tag 的映像，首頁回 200，且 `/runtime-config.js` 的 `apiBaseUrl` 是 `https://api.stevenshih-littleduck.com`
 
 #### Scenario: 未核准
-- **WHEN** Staging 通過但沒有人 promote
+- **WHEN** Staging 通過但沒有人觸發 deployment
 - **THEN** `https://stevenshih-littleduck.com` 維持原版本
 
 #### Scenario: 建置未全綠
-- **WHEN** 使用者 promote 一個 push 建置未全部通過的 commit
+- **WHEN** 使用者對一個 push 建置未全部通過的 commit 觸發 deployment
 - **THEN** CD 在部署前失敗，Production 不變
 
 ### Requirement: 前端可打包為自架映像
@@ -43,7 +43,7 @@
 - **THEN** 新容器的 `/runtime-config.js` 回傳新的位址，不需重新建置
 
 ### Requirement: main 推送後產出並推送前端映像
-推送到 `main` 且前端 CI 通過時，CD SHALL 建置前端映像、通過弱點掃描後推送到 GHCR，tag 為 `<version>-<git 短 sha>`、`<version>` 與 `latest`，`<version>` 取自 `frontend/package.json`；`<version>-<git 短 sha>` MUST 是不可變的部署依據。
+推送到 `main` 時，CD SHALL 直接建置前端映像（不先重跑 CI 檢查）、通過弱點掃描後推送到 GHCR，tag 為 `<version>-<git 短 sha>`、`<version>` 與 `latest`，`<version>` 取自 `frontend/package.json`；`<version>-<git 短 sha>` MUST 是不可變的部署依據。
 
 #### Scenario: 推送映像
 - **WHEN** 一個 commit 合併進 `main`
