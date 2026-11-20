@@ -72,7 +72,7 @@
 前端的 Node.js 執行環境 SHALL 統一為 Node 24。這包括前端 CI 每個用到 Node 的步驟、前端映像的建置與執行階段，以及開發環境的版本宣告（`package.json` 的 `engines.node` 與 `frontend/.nvmrc`）。repo MUST NOT 在前端 CI、前端映像或版本宣告中指定已停止支援的 Node 大版本。`@types/node` 的大版本 MUST 與執行環境的 Node 大版本一致。
 
 #### Scenario: CI 使用 Node 24
-- **WHEN** 檢視 `.drone.yml` 的 `ci-frontend` pipeline 中所有以 Node 映像執行的步驟
+- **WHEN** 檢視 `.woodpecker/ci-frontend.yaml` 中所有以 Node 映像執行的步驟
 - **THEN** 每一步都使用 Node 24 映像，沒有任何一步使用 Node 20 或更舊的映像
 
 #### Scenario: 前端容器以 Node 24 執行
