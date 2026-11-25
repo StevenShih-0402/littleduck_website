@@ -1,0 +1,6 @@
+openapi: 3.0.3
+info:
+  title: littleduck_website API — sdp-187-footer-contact
+  version: 0.0.0
+  description: 本次無 API 變動。SDP-187 只在前台頁尾新增固定的聯絡 Email（前端站台常數），不新增或修改任何端點。
+paths: {}

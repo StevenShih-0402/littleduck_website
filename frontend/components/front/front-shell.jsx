@@ -1,5 +1,5 @@
 // frontend/components/front/front-shell.jsx
-// 前台外框：公告列、頁首導覽（含手機抽屜）、主題切換、頁尾與贊助按鈕
+// 前台外框：公告列、頁首導覽（含手機抽屜）、主題切換、頁尾（版權、聯絡 Email、社群連結）與贊助按鈕
 
 "use client";
 
@@ -122,7 +122,14 @@ export default function FrontShell({ children }) {
 
       <footer className="border-t rule-heavy mt-6" style={{ borderTopWidth: "var(--heavy)" }}>
         <div className="max-w-[1100px] mx-auto px-4 sm:px-6 py-5 flex flex-col sm:flex-row gap-2 justify-between mono text-[10.5px] uppercase tracking-[.15em] v-dim">
-          <div>{SITE.copyright}</div>
+          <div className="flex flex-col sm:flex-row gap-x-6 gap-y-1">
+            <div>{SITE.copyright}</div>
+            {/* SDP-187：固定聯絡 Email（綠界審核需要），mailto 連結；normal-case 讓 Email 維持小寫原文 */}
+            <div>
+              Contact:{" "}
+              <a href={"mailto:" + SITE.contactEmail} className="hover-rule cursor-pointer normal-case tracking-normal">{SITE.contactEmail}</a>
+            </div>
+          </div>
           <div className="flex gap-4">
             {/* SDP-105：刻意偏離設計稿（原本 preventDefault）。依 classifyHref 渲染，佔位或不安全網址顯示為不可點的文字 */}
             {(db.settings.social || []).map(s => {

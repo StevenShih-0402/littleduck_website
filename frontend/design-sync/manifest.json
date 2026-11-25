@@ -34,6 +34,14 @@
       "sha256": "2256c60aa9512e20cfc576f712acaeb47d44e035f620aa69820a35cabcff0909",
       "targets": [
         "data/site.js"
+      ],
+      "deviations": [
+        {
+          "target": "data/site.js",
+          "issue": "SDP-187",
+          "since": "2026-11-25",
+          "note": "SITE 新增 contactEmail（頁尾聯絡 Email，綠界審核需要）"
+        }
       ]
     },
     "project/v2/admin-manage.jsx": {
@@ -135,6 +143,12 @@
           "issue": "SDP-149",
           "since": "2026-11-13",
           "note": "SponsorFab 以 FeatureGate（sponsor）包住，停用時隱藏，管理員預覽時傳 preview"
+        },
+        {
+          "target": "components/front/front-shell.jsx",
+          "issue": "SDP-187",
+          "since": "2026-11-25",
+          "note": "頁尾新增聯絡 Email（mailto 連結，Email 不套用 uppercase）"
         },
         {
           "target": "components/front/guest-page.jsx",
