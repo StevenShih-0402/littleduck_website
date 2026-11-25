@@ -11,9 +11,9 @@
   integrator 檢查、PR 前審查、CI 或 PR 中檢查退回時改回被退回那一端的 backend／frontend（退回 architect 為 proposal）。
   合併隊列失敗不改階段，停下交給 user。 -->
 
-- **階段**：reviewing <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
-- **最後完成**：PR 前審查
-- **下一步**：Teshima 收尾
+- **階段**：pr-checking <!-- proposal | backend | frontend | integrating | reviewing | pr-checking | awaiting-approval | archived -->
+- **最後完成**：integrator 收尾（開 PR）
+- **下一步**：PR 中檢查
 - **暫停原因**：無
 - **更新**：主對話 — 2026-11-25 23:35
 
@@ -51,3 +51,16 @@
 - **截圖觀察點**：無設定；環境無瀏覽器，未能實際看 MAG／TERM 頁尾。
 - **停止**：docker compose down -v、next 已停，3100／18080 無殘留。
 - **風險**：兩主題畫面與小寫顯示僅能由程式碼審視佐證（頁尾為兩主題共用 JSX、Email 有 `normal-case tracking-normal`、色彩沿用 `v-dim`），請 PR 前審查確認。
+
+---
+
+## integrator（Teshima）— 收尾
+
+- **重切前 SHA（OLD）**：`cc2d914f1f23092f92013d1aa0ec942c322a2380`
+- **重切起點（FROM）**：merge-base origin/main（`git merge-base HEAD origin/main`）
+- **重切後 commit**：`09c763f` feat(web): 前台頁尾新增聯絡 Email（SDP-187）（前端程式、manifest 與變更目錄同一批；本 change 無後端）
+- **tree 比對**：`git diff OLD HEAD` 為空
+- **PR**：https://github.com/StevenShih-0402/littleduck_website/pull/23
+- **附進 PR 的 review.md 備註**：1 條（FE，規格情境無自動化測試）
+- **風險**：無新增
+- **收尾 HEAD**：`09c763fa49749a1b65ae8ecf30e88284f11e8c2f`
