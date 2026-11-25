@@ -9,6 +9,7 @@ export const SITE = {
   motto: "Do what you can, and make it the best you can.",
   updated: "2025 / 08 / 27",
   copyright: "© 2026 Steven SHIH. All rights reserved.",
+  contactEmail: "steven0210423@gmail.com",
   nav: [
     { key: "home", zh: "首頁",     en: "Home" },
     { key: "lit",  zh: "文學創作", en: "Literature" },
